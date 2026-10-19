@@ -8,7 +8,17 @@ name: ISO
 
 on:
   push:
+    paths-ignore:
+      - "**/*.md"
+      - "docs/**"
+      - "LICENSE"
+      - "LICENSES/**"
   pull_request:
+    paths-ignore:
+      - "**/*.md"
+      - "docs/**"
+      - "LICENSE"
+      - "LICENSES/**"
   workflow_dispatch:
 
 permissions:

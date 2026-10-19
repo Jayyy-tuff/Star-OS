@@ -17,9 +17,9 @@ security uncertainties, and record human approval of the architecture.
 | Wayland/compositor evaluation | ADR-0004 | KWin accepted; shell hosting decided by M0.2 |
 | Installer framework evaluation | ADR-0005 | Calamares accepted |
 | Btrfs snapshot and recovery prototype plan | ADR-0006 | Deferred to Phase 2 with plan |
-| Build environment setup | ADR-0003 + milestone M0.1 | Implemented; see CI results before claiming it works |
-| Qt/QML shell prototype | milestone M0.2 | Not started (starts after M0.1 passes) |
-| Moon Browser integration checklist | integrations/moon-browser/ | Written; blocked on source |
+| Build environment setup | ADR-0003 + milestone M0.1 | **M0.1 complete** (CI build, QEMU boots, VMware boot) |
+| Qt/QML shell prototype | milestone M0.2 | In progress |
+| Moon Browser integration checklist | — | Removed from the current scope at the owner's request (2026-10-19); the owner will add Moon Browser later. No other browser will be substituted without approval |
 
 ## Smallest useful deliverable: M0.1 — console ISO prototype
 
@@ -97,7 +97,7 @@ Evidence: [ISO run #1](https://github.com/Jayyy-tuff/Star-OS/actions/runs/393157
 | 3. QEMU boot, UEFI and BIOS | **Pass** (both runs). UEFI: `id=staros firmware=uefi kernel=7.2.9-arch1-1`, marker 43 s / 38 s after QEMU start. BIOS: `firmware=bios`, 32 s / 32 s. KVM on GitHub-hosted runners. The harness correctly failed a non-bootable image in every run (T0-09) |
 | 4. Star OS identity | **Pass.** `id=staros` reported at boot. Run #2 build records list the renamed entries: systemd-boot (normal and speech), GRUB (`grub.cfg`, `loopback.cfg`), and syslinux (BIOS, speech, PXE) |
 | 5. shellcheck | **Pass** |
-| 6. VMware Workstation boot | **Not yet run.** Owner action, see the [test plan](test-plan.md#manual-procedure-vmware-workstation-boot-t0-10--t0-11) |
+| 6. VMware Workstation boot | **Pass**, reported by the owner on 2026-10-19 (T0-10, see the [manual test log](test-plan.md#manual-test-log)) |
 
 The boot times are measured in CI QEMU from QEMU start to the marker. They are
 not performance claims for any real machine.

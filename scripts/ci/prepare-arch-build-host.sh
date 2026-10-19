@@ -1,9 +1,10 @@
 #!/usr/bin/env bash
 # SPDX-License-Identifier: GPL-3.0-or-later
 #
-# Turns a throwaway Arch Linux container into a Star OS ISO build host: points
+# Turns a throwaway Arch Linux container into a Star OS build host: points
 # pacman at the baseline snapshot (ADR-0002), syncs every installed package to
-# it (including downgrades), and installs the pinned archiso.
+# it (including downgrades), and installs the pinned archiso plus any packages
+# given as arguments.
 #
 # This rewrites the host's mirrorlist and pacman.conf, so it refuses to run
 # unless STAROS_DISPOSABLE_HOST=1 confirms the host is disposable.
@@ -27,5 +28,5 @@ sed -i -E '/^[[:space:]]*NoExtract[[:space:]]*=/d' /etc/pacman.conf
 
 pacman-key --init
 pacman-key --populate archlinux
-pacman -Syyuu --noconfirm --needed archiso grub
-pacman -Q archiso grub
+pacman -Syyuu --noconfirm --needed archiso grub "$@"
+pacman -Q archiso grub "$@"

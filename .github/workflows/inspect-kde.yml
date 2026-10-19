@@ -1,0 +1,47 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+#
+# Prints facts about the KWin/Plasma packages in the package baseline
+# (scripts/ci/inspect-kde.sh). Used to design milestone M0.2 against the real
+# pinned packages, because the agent environment cannot reach KDE sources.
+
+name: Inspect KDE baseline
+
+on:
+  push:
+    paths:
+      - ".github/workflows/inspect-kde.yml"
+      - "scripts/ci/inspect-kde.sh"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  inspect:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    container:
+      image: archlinux:latest
+      options: --privileged
+    steps:
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+      - name: Prepare pinned host with KDE packages
+        shell: bash
+        env:
+          STAROS_DISPOSABLE_HOST: "1"
+        run: |
+          scripts/ci/prepare-arch-build-host.sh kwin plasma-workspace plasma-desktop \
+            layer-shell-qt qt6-declarative qt6-wayland qt6-tools orca xorg-xwayland \
+            mesa konsole spectacle file binutils
+      - name: Inspect
+        shell: bash
+        run: scripts/ci/inspect-kde.sh 2>&1 | tee inspect-kde.txt
+      - name: Upload report
+        if: always()
+        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5.0.0
+        with:
+          name: inspect-kde
+          path: |
+            inspect-kde.txt
+            /tmp/shot.png
+          if-no-files-found: warn

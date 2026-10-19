@@ -100,4 +100,4 @@ Status: draft, covering Phase 0 in detail and later phases in outline.
 
 | Date | Test | Commit / CI run | Environment (VMware version, host OS, firmware) | Result | Notes / logs |
 | --- | --- | --- | --- | --- | --- |
-| — | — | — | — | No manual tests run yet | — |
+| 2026-10-19 | T0-10 | A CI-built M0.1 ISO (run not recorded) | VMware Workstation on the owner's PC (version and firmware settings not recorded) | **Pass** — owner report: "Everything works fine" | — |

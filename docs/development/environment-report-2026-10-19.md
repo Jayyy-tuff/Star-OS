@@ -73,4 +73,4 @@ Outbound traffic goes through a policy proxy. Results:
 | QEMU + OVMF with KVM | Automated boot tests | GitHub-hosted Linux runners, which expose KVM after a documented udev rule (ADR-0003). |
 | VMware Workstation | Priority VM boot test | Owner runs the manual procedure in the test plan and records results. |
 | Network access to Arch mirrors / Arch Linux Archive | Any local build in this cloud session | Optional: widen this cloud environment's network access (environment settings → Network access) to allow the Arch mirror and archive hosts. Not required if CI is used. |
-| Moon Browser source and license | Browser integration | Owner supplies the repository location (see `integrations/moon-browser/`). |
+| Moon Browser source and license | Browser integration | Owner supplies the repository location. (Later on 2026-10-19 the owner removed Moon Browser from the current scope.) |

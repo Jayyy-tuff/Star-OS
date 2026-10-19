@@ -66,5 +66,6 @@ every new privileged component.
 
 - Who holds the package and release signing keys, and on what hardware?
 - Will the project apply for Microsoft-signed shim (ADR-0006)?
-- Moon Browser's security update process and sandboxing model are unknown
-  until its source is reviewed.
+- The default browser is undecided. Moon Browser was removed from the current
+  scope at the owner's request (2026-10-19). Whatever browser ships needs its
+  own review of its security update process and sandboxing.
