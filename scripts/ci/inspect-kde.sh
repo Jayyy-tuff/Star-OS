@@ -55,7 +55,7 @@ grep -r -h 'X-KDE-Wayland-Interfaces\|X-KDE-DBUS-Restricted-Interfaces' /usr/sha
 
 section "QML modules"
 ls /usr/lib/qt6/qml/org/kde/ 2>&1
-ls /usr/lib/qt6/qml/org/kde/plasma/private 2>&1 | head -60
+find /usr/lib/qt6/qml/org/kde/plasma/private -mindepth 1 -maxdepth 1 | sort | head -60
 for m in taskmanager layershell plasma/private/kicker; do
     show "/usr/lib/qt6/qml/org/kde/$m/qmldir" 30
 done
@@ -82,7 +82,8 @@ EOF
 QT_QPA_PLATFORM=offscreen timeout 60 /usr/lib/qt6/bin/qmltestrunner -input /tmp/qt 2>&1 | tail -20
 
 section "Smoke: KWin virtual backend with a screenshot"
-export XDG_RUNTIME_DIR=/tmp/xdg && mkdir -p -m 0700 "$XDG_RUNTIME_DIR"
+export XDG_RUNTIME_DIR=/tmp/xdg
+mkdir -p "$XDG_RUNTIME_DIR" && chmod 0700 "$XDG_RUNTIME_DIR"
 cat >/tmp/kwin-session.sh <<'EOF'
 #!/bin/bash
 sleep 8
