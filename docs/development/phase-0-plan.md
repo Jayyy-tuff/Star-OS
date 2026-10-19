@@ -86,20 +86,29 @@ README says "boots in QEMU (CI)" and nothing about VMware.
 
 ### Status (2026-10-19)
 
-First CI run: [ISO run #1](https://github.com/Jayyy-tuff/Star-OS/actions/runs/39315730622)
-on commit `27a290a`.
+Evidence: [ISO run #1](https://github.com/Jayyy-tuff/Star-OS/actions/runs/39315730622)
+(commit `27a290a`) and [ISO run #2](https://github.com/Jayyy-tuff/Star-OS/actions/runs/39317741583)
+(commit `9a0f391`, all jobs green).
 
 | Criterion | Result |
 | --- | --- |
-| 1. CI builds the ISO and uploads records | **Pass.** archiso 91-1, snapshot 2026-10-15, 455 packages, `staros-2026.10.19-x86_64.iso` (1.6 GB, SHA-256 `ae30cbcc…50e7fb`), build step about 9 minutes |
-| 2. Pinned package inputs | Package list recorded in `distro/baseline/packages.x86_64.txt`. The comparison (T0-05) runs from the next build on |
-| 3. QEMU boot, UEFI and BIOS | **Pass.** UEFI: `id=staros firmware=uefi kernel=7.2.9-arch1-1`, marker 43 s after QEMU start. BIOS: same with `firmware=bios`, 32 s. KVM on GitHub-hosted runners. The harness correctly failed a non-bootable image (T0-09) |
-| 4. Star OS identity | `id=staros` reported at boot. The boot-title renaming step ran. From the next build, the renamed entries are printed in the build records |
+| 1. CI builds the ISO and uploads records | **Pass** (runs #1 and #2). archiso 91-1, boot modes `bios.syslinux uefi.systemd-boot`, snapshot 2026-10-15, 455 packages, 1.6 GB ISO. Build step about 9–11 minutes |
+| 2. Pinned package inputs | **Pass.** Run #2's package list is identical to run #1's, which is recorded in `distro/baseline/packages.x86_64.txt` (T0-05). ISO checksums differ between runs because the build timestamp differs; byte-identical ISOs are not claimed |
+| 3. QEMU boot, UEFI and BIOS | **Pass** (both runs). UEFI: `id=staros firmware=uefi kernel=7.2.9-arch1-1`, marker 43 s / 38 s after QEMU start. BIOS: `firmware=bios`, 32 s / 32 s. KVM on GitHub-hosted runners. The harness correctly failed a non-bootable image in every run (T0-09) |
+| 4. Star OS identity | **Pass.** `id=staros` reported at boot. Run #2 build records list the renamed entries: systemd-boot (normal and speech), GRUB (`grub.cfg`, `loopback.cfg`), and syslinux (BIOS, speech, PXE) |
 | 5. shellcheck | **Pass** |
 | 6. VMware Workstation boot | **Not yet run.** Owner action, see the [test plan](test-plan.md#manual-procedure-vmware-workstation-boot-t0-10--t0-11) |
 
 The boot times are measured in CI QEMU from QEMU start to the marker. They are
 not performance claims for any real machine.
+
+Known follow-ups (not blocking):
+
+- `actions/upload-artifact` and `actions/download-artifact` v5.0.0 still target
+  Node.js 20. GitHub currently forces them onto Node.js 24 with a warning. Bump
+  them to releases that target Node.js 24, pinned to verified commit SHAs.
+- The package-list query prints a harmless "database file … does not exist"
+  warning, because the live root has no sync databases.
 
 ### Explicitly out of scope for M0.1
 
