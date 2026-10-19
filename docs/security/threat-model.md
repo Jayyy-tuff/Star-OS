@@ -1,0 +1,70 @@
+# Initial threat model
+
+Status: draft (Phase 0). This model will be revisited at each phase gate and for
+every new privileged component.
+
+## Assets
+
+| Asset | Why it matters |
+| --- | --- |
+| User files and personal data | Loss or disclosure harms users directly |
+| Credentials, tokens, Wi-Fi keys | Account takeover, network access |
+| Disk-encryption passphrases and recovery keys | Lockout if lost; disclosure defeats encryption |
+| Integrity of the installed system | A tampered system can do anything |
+| Star OS package and release signing keys | Compromise lets an attacker ship updates to every user |
+| Build and CI infrastructure | Compromise lets an attacker tamper with ISOs and packages |
+| Users' disks during installation | The installer can destroy data |
+
+## Adversaries and failure sources
+
+1. Network attacker (public Wi-Fi, hostile mirror, DNS manipulation).
+2. Compromised or malicious upstream package or dependency.
+3. Malicious or buggy local application running as the user.
+4. Physical attacker with a lost or stolen device.
+5. Malicious contribution (pull request) or compromised maintainer account.
+6. Compromised CI runner or third-party CI action.
+7. **Our own bugs**, especially in the installer, updater, and privileged
+   services. For data loss, this is the most likely source.
+
+## Trust boundaries
+
+```
+[User apps] --D-Bus--> [Star OS user services] --D-Bus + Polkit--> [privileged services] --> [system]
+[Mirrors / Star OS repo] --signed packages--> [pacman] --> [system]
+[Git repo] --> [CI build] --> [ISO + checksums/signatures] --> [user download]
+[Installer UI (root in live session)] --> [partitioning / encryption / bootloader] --> [user disks]
+```
+
+## Key threats and planned mitigations
+
+| # | Threat | Planned mitigation | Phase |
+| --- | --- | --- | --- |
+| 1 | Tampered packages from a mirror | pacman signature verification is never disabled; `archlinux-keyring` stays current; Star OS repository signed with documented key rotation | 0 (policy), 4 (Star OS repo) |
+| 2 | Tampered ISO download | Published SHA-256 checksums, then signed checksums before any public release | 0 (checksums), 7 (signing) |
+| 3 | GUI tricks a privileged service | Privileged services validate every input themselves and authorize per action through Polkit; no shell-string construction; no implicit elevation | 1+ |
+| 4 | Installer erases the wrong disk | Explicit target selection; destructive confirmation naming the disk (model, size, partitions); release-blocking multi-disk tests (ADR-0005) | 2 |
+| 5 | Encryption lockout | Recovery-key explanation **before** formatting; tested unlock and recovery procedure; honest limits | 2 |
+| 6 | Unsafe update leaves the system unbootable | Pre-update snapshot verified before risky updates; low-space and conflict checks; documented recovery (ADR-0006) | 2, 4 |
+| 7 | Compromised CI or third-party actions | Pin actions to commit SHAs; minimal workflow permissions; no secrets for fork PRs; no release-signing keys on hosted runners | 0 |
+| 8 | Malicious pull request | Mandatory review for `distro/`, `scripts/`, `.github/`, and privileged services; CODEOWNERS once the team exists | 0 |
+| 9 | Secrets in logs or diagnostic bundles | Redaction rules, opt-in diagnostics with a preview of contents, secrets only in system credential stores | 1+ |
+| 10 | Theme/preset import runs code | Presets are data only, validated against a schema; never executed | 5 |
+| 11 | Lost device | Full-disk encryption recommended at install | 2 |
+
+## Accepted risks in Phase 0
+
+- **The live ISO automatically logs in as root on the console** (archiso
+  `releng` behaviour). Acceptable for live media meant for testing. It must
+  never carry over to an installed system. Phase 1 will move the live graphical
+  session to an unprivileged live user.
+- **No Secure Boot.** Users must disable Secure Boot to boot prototypes
+  (ADR-0006).
+- **Prototype ISOs are unsigned.** CI artifacts are for testing only and must
+  not be called official builds.
+
+## Open questions
+
+- Who holds the package and release signing keys, and on what hardware?
+- Will the project apply for Microsoft-signed shim (ADR-0006)?
+- Moon Browser's security update process and sandboxing model are unknown
+  until its source is reviewed.
