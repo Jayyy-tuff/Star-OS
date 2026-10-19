@@ -1,0 +1,12 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+[Unit]
+Description=Star OS live boot report for automated tests
+After=getty.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/libexec/staros-boot-check
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target

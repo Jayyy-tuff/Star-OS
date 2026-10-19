@@ -1,7 +1,7 @@
 # Contributing to Star OS (draft)
 
-> Draft. Outside contributions cannot be accepted until a license is chosen
-> ([ADR-0007](docs/decisions/0007-licensing.md)).
+> Draft. Contributions are accepted under GPL-3.0-or-later (code) and
+> CC-BY-SA-4.0 (documentation); see [LICENSES.md](LICENSES.md).
 
 ## How work is done
 
@@ -34,4 +34,4 @@ Each commit carries a `Signed-off-by:` line under the
 
 ## Code of conduct
 
-To be adopted together with the license decision.
+Not yet adopted. Needs an owner decision.

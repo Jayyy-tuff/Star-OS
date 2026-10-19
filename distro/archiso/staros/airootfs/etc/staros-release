@@ -1,0 +1,9 @@
+NAME="Star OS"
+PRETTY_NAME="Star OS live (prototype M0.1)"
+ID=staros
+ID_LIKE=arch
+VERSION_ID=0.0.1
+VERSION="0.0.1 (prototype M0.1)"
+VARIANT="Live prototype"
+VARIANT_ID=live-prototype
+HOME_URL="https://github.com/Jayyy-tuff/Star-OS"

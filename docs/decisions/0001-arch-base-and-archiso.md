@@ -1,8 +1,8 @@
 # ADR-0001: Arch Linux base and archiso for live/installation media
 
-- Status: Proposed
+- Status: Accepted
 - Date: 2026-10-19
-- Deciders: pending owner approval
+- Deciders: project owner
 
 ## Context
 
@@ -25,18 +25,35 @@ session and an installer.
    aimed at disk/OS images more than hybrid live ISOs; less common for Arch
    live media.
 
-## Decision (proposed)
+## Decision
 
 Use **archiso**. Derive the Star OS profile from the `releng` profile of a
-**specific, recorded archiso version**: copy that version's
-`/usr/share/archiso/configs/releng`, commit it unchanged as the first step,
-then apply Star OS changes as small, reviewable commits on top.
+**specific, recorded archiso version**, and keep every Star OS change small and
+reviewable.
 
-Starting from an unchanged copy makes every Star OS change visible in `git log`
-and makes upgrading to a newer archiso a reviewable diff, rather than relying
-on our memory of the profile format. (The profile format has changed between
-archiso versions — for example, the names of boot modes — so the version in use
-must be recorded and checked by the build script.)
+The profile format has changed between archiso versions (for example, the
+names of boot modes). So the version in use is recorded in
+`distro/archiso/ARCHISO_VERSION`, and the build script refuses to run with any
+other version.
+
+### Implementation note (2026-10-19)
+
+The proposal was to commit an unchanged copy of `releng` and then change it in
+later commits. The agent that implemented M0.1 could not obtain `releng`: its
+environment cannot reach Arch package sources. M0.1 therefore **assembles** the
+profile at build time instead:
+
+1. Copy `releng` from the pinned archiso package installed on the build host.
+2. Apply the Star OS overlay in `distro/archiso/staros/` (extra files, and
+   `profiledef.sh` settings appended so that they override releng's).
+3. Apply two checked edits: pacman repositories pinned to the baseline
+   snapshot, and boot menu titles. Each edit fails the build if the expected
+   releng text is not found.
+
+Every Star OS change is still a reviewable file in git. The assembled profile is
+uploaded with each CI build (`profile.tar.gz`) so reviewers can see the
+complete result. If the overlay grows to the point that reading it is harder
+than reading a full profile, switch to a committed full copy.
 
 ## Consequences and trade-offs
 
@@ -57,4 +74,4 @@ must be recorded and checked by the build script.)
 
 ## Approval
 
-- Approved by: pending
+- Approved by: project owner (GitHub @Jayyy-tuff), 2026-10-19, in the AI agent session, as part of approving milestone M0.1

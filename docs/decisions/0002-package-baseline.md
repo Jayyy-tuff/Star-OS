@@ -1,8 +1,8 @@
 # ADR-0002: Package baseline pinned to Arch Linux Archive snapshots
 
-- Status: Proposed
+- Status: Accepted
 - Date: 2026-10-19
-- Deciders: pending owner approval
+- Deciders: project owner
 
 ## Context
 
@@ -23,7 +23,7 @@ immutable or atomic OS.
 3. **A Star OS–hosted mirror snapshot** — same idea, but hosted by the project.
    More robust and faster, but needs infrastructure, storage, and an operator.
 
-## Decision (proposed)
+## Decision
 
 - **Phase 0–1:** builds use option 2. The baseline date lives in one file
   (`distro/baseline/ARCH_SNAPSHOT_DATE`, to be created with the first build
@@ -54,4 +54,4 @@ immutable or atomic OS.
 
 ## Approval
 
-- Approved by: pending
+- Approved by: project owner (GitHub @Jayyy-tuff), 2026-10-19, in the AI agent session, as part of approving milestone M0.1

@@ -1,8 +1,8 @@
 # ADR-0003: Build and test infrastructure
 
-- Status: Proposed
+- Status: Accepted
 - Date: 2026-10-19
-- Deciders: pending owner approval
+- Deciders: project owner
 
 ## Context
 
@@ -27,7 +27,7 @@ person watching.
 4. **This cloud session** — would need its network policy widened to Arch hosts,
    and still has no KVM, so boot tests would be slow software emulation.
 
-## Decision (proposed)
+## Decision
 
 - **Automated:** option 1 is the system of record. Every pushed change runs
   lint → ISO build → QEMU boot tests (UEFI, and BIOS while BIOS is kept). The
@@ -58,4 +58,4 @@ person watching.
 
 ## Approval
 
-- Approved by: pending
+- Approved by: project owner (GitHub @Jayyy-tuff), 2026-10-19, in the AI agent session ("build in CI")

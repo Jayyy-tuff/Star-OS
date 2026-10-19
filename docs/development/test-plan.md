@@ -30,11 +30,11 @@ Status: draft, covering Phase 0 in detail and later phases in outline.
 | T0-02 | Build host check | E-CI | `build-iso.sh` refuses to run if not on Arch, not root, or archiso version ≠ `ARCHISO_VERSION`, with a clear message |
 | T0-03 | ISO builds | E-CI | `mkarchiso` exits 0. ISO, `SHA256SUMS`, and manifest exist and are uploaded |
 | T0-04 | Checksum verifies | E-CI | `sha256sum -c SHA256SUMS` passes on the downloaded artifact |
-| T0-05 | Pinned inputs | E-CI | Two builds at the same baseline date have identical package manifests |
-| T0-06 | UEFI boot | E-CI | QEMU + OVMF: marker `STAROS-LIVE-BOOT-OK` appears on the serial console within the timeout (start at 5 min, then tighten from measurements) |
-| T0-07 | BIOS boot | E-CI | Same as T0-06 with SeaBIOS |
-| T0-08 | Identity | E-CI | Boot log shows the Star OS boot menu title. `/etc/os-release` has `ID=staros` |
-| T0-09 | Failure logs | E-CI | A deliberately broken boot (bad kernel parameter in a test-only job) fails T0-06 **and** still uploads the serial log |
+| T0-05 | Pinned inputs | E-CI | The ISO's package list equals the recorded `distro/baseline/packages.x86_64.txt`, so every build at the same baseline date has the same packages |
+| T0-06 | UEFI boot | E-CI | QEMU + OVMF: the boot report and marker `STAROS-LIVE-BOOT-OK` appear on the serial console within the timeout (start at 5 min, then tighten from measurements). The report must say `firmware=uefi` |
+| T0-07 | BIOS boot | E-CI | Same as T0-06 with SeaBIOS and `firmware=bios` |
+| T0-08 | Identity | E-CI | The build log shows the Star OS boot menu titles. The boot report has `id=staros` (from `/etc/staros-release`) |
+| T0-09 | Failure detection | E-CI | The harness, given a non-bootable image, reports a failed boot (exit 1) and still writes its result file and logs. Boot logs are uploaded whether a boot passes or fails |
 | T0-10 | VMware UEFI boot | E-VMW | See manual procedure. Shell reached, marker present in journal |
 | T0-11 | VMware BIOS boot | E-VMW | Same with BIOS firmware (optional while BIOS support is undecided) |
 
@@ -92,7 +92,7 @@ Status: draft, covering Phase 0 in detail and later phases in outline.
    shell prompt? How long does it take, measured roughly from power-on to the
    prompt?
 7. At the prompt, run and photograph or copy the output:
-   `cat /etc/os-release`, `systemctl is-system-running`,
+   `cat /etc/staros-release`, `systemctl is-system-running`,
    `journalctl -b -u staros-boot-check --no-pager`, `ip -br link`, `lsblk`.
 8. Fill in a row in the log below. Attach any errors or screenshots to an issue.
 

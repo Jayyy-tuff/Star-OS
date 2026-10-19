@@ -1,0 +1,24 @@
+#!/usr/bin/env bash
+# SPDX-License-Identifier: GPL-3.0-or-later
+#
+# Prints a one-line boot report followed by the STAROS-LIVE-BOOT-OK marker.
+# The output goes to the journal and, if a serial port is present, to
+# /dev/ttyS0, where tests/iso/boot_test.py reads it from QEMU.
+
+set -u
+
+firmware=bios
+[[ -d /sys/firmware/efi ]] && firmware=uefi
+id=$(sed -n 's/^ID=//p' /etc/staros-release 2>/dev/null)
+
+report() {
+    printf 'STAROS-BOOT-CHECK id=%s firmware=%s kernel=%s\n' \
+        "${id:-unknown}" "$firmware" "$(uname -r)"
+    printf 'STAROS-LIVE-BOOT-OK\n'
+}
+
+report
+if [[ -c /dev/ttyS0 ]]; then
+    # A machine without a real serial port fails this write; that is fine.
+    report | timeout 5 tee /dev/ttyS0 >/dev/null || true
+fi

@@ -1,0 +1,160 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+#
+# Milestone M0.1: lint -> build the live ISO in a pinned Arch container ->
+# boot it in QEMU (UEFI and BIOS) and compare its packages with the baseline.
+# Test IDs refer to docs/development/test-plan.md.
+
+name: ISO
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: iso-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    name: Lint and unit tests (T0-01)
+    runs-on: ubuntu-24.04
+    outputs:
+      source-date-epoch: ${{ steps.epoch.outputs.value }}
+    steps:
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+      - name: shellcheck
+        run: |
+          shellcheck --version
+          shellcheck --external-sources \
+            scripts/*.sh scripts/lib/*.sh scripts/ci/*.sh \
+            distro/archiso/staros/profiledef.append.sh \
+            distro/archiso/staros/airootfs/usr/local/libexec/staros-boot-check
+      - name: Boot test harness unit tests
+        run: python3 -m unittest discover -s tests/iso -v
+      - name: Record source date epoch
+        id: epoch
+        run: echo "value=$(git log -1 --format=%ct)" >> "$GITHUB_OUTPUT"
+
+  build:
+    name: Build ISO (T0-02, T0-03)
+    needs: lint
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    container:
+      image: archlinux:latest
+      options: --privileged
+    env:
+      SOURCE_DATE_EPOCH: ${{ needs.lint.outputs.source-date-epoch }}
+    steps:
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+      - name: Prepare pinned Arch build host
+        shell: bash
+        env:
+          STAROS_DISPOSABLE_HOST: "1"
+        run: scripts/ci/prepare-arch-build-host.sh
+      - name: Build ISO
+        shell: bash
+        run: scripts/build-iso.sh 2>&1 | tee build.log
+      - name: Upload ISO
+        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5.0.0
+        with:
+          name: staros-iso
+          path: |
+            out/*.iso
+            out/SHA256SUMS
+          compression-level: 0
+          retention-days: 14
+          if-no-files-found: error
+      - name: Upload build records
+        if: always()
+        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5.0.0
+        with:
+          name: staros-build-records
+          path: |
+            build.log
+            out/SHA256SUMS
+            out/*.txt
+            out/profile.tar.gz
+          retention-days: 30
+          if-no-files-found: warn
+
+  package-manifest:
+    name: Package baseline (T0-05)
+    needs: build
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+      - uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5.0.0
+        with:
+          name: staros-build-records
+          path: records
+      - name: Compare with distro/baseline/packages.x86_64.txt
+        run: scripts/ci/check-package-manifest.sh records/out/packages.x86_64.txt
+
+  boot-test:
+    name: Boot test ${{ matrix.firmware }} (T0-04, T0-06..T0-09)
+    needs: build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        firmware: [uefi, bios]
+    steps:
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' \
+            | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+          ls -l /dev/kvm
+      - name: Install QEMU and OVMF
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends qemu-system-x86 ovmf
+          qemu-system-x86_64 --version
+      - uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5.0.0
+        with:
+          name: staros-iso
+          path: iso
+      - name: Verify checksum (T0-04)
+        working-directory: iso
+        run: sha256sum -c SHA256SUMS
+      - name: Harness reports a failed boot (T0-09)
+        run: |
+          truncate -s 1M not-bootable.img
+          status=0
+          python3 tests/iso/boot_test.py --iso not-bootable.img --firmware "${{ matrix.firmware }}" \
+            --timeout 30 --log-dir selftest --require-kvm || status=$?
+          if [ "$status" -ne 1 ]; then
+            echo "expected exit status 1 (boot failed), got $status"
+            exit 1
+          fi
+          test -s "selftest/result-${{ matrix.firmware }}.json"
+      - name: Boot ISO (T0-06 UEFI / T0-07 BIOS, T0-08)
+        shell: bash
+        run: |
+          shopt -s nullglob
+          isos=(iso/*.iso)
+          [[ ${#isos[@]} -eq 1 ]] || { echo "expected one ISO, found ${#isos[@]}"; exit 1; }
+          python3 tests/iso/boot_test.py --iso "${isos[0]}" --firmware "${{ matrix.firmware }}" \
+            --timeout 300 --log-dir boot-logs --require-kvm
+      - name: Upload boot logs
+        if: always()
+        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5.0.0
+        with:
+          name: boot-logs-${{ matrix.firmware }}
+          path: |
+            boot-logs/*.log
+            boot-logs/*.json
+            boot-logs/*.ppm
+            selftest/*.log
+            selftest/*.json
+            selftest/*.ppm
+          retention-days: 30
+          if-no-files-found: warn

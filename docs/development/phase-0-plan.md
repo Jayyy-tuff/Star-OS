@@ -9,16 +9,16 @@ security uncertainties, and record human approval of the architecture.
 | Deliverable | Where | Status |
 | --- | --- | --- |
 | Repository initialized | this repo | Done (documentation only) |
-| License and contribution policy | ADR-0007, CONTRIBUTING.md | License: owner decision pending. Contribution policy: draft |
+| License and contribution policy | ADR-0007, LICENSES.md, CONTRIBUTING.md | License accepted (GPL-3.0-or-later; docs CC-BY-SA-4.0). Contribution policy: draft |
 | Initial threat model | docs/security/threat-model.md | Draft |
-| Architecture decision records | docs/decisions/ | Proposed |
+| Architecture decision records | docs/decisions/ | 0001–0005 and 0007 accepted; 0006 deferred |
 | Supported hardware assumptions | below | Draft |
-| Package baseline policy | ADR-0002 | Proposed |
-| Wayland/compositor evaluation | ADR-0004 | Proposed; prototype gate defined |
-| Installer framework evaluation | ADR-0005 | Proposed |
+| Package baseline policy | ADR-0002 | Accepted |
+| Wayland/compositor evaluation | ADR-0004 | KWin accepted; shell hosting decided by M0.2 |
+| Installer framework evaluation | ADR-0005 | Calamares accepted |
 | Btrfs snapshot and recovery prototype plan | ADR-0006 | Deferred to Phase 2 with plan |
-| Build environment setup | ADR-0003 + milestone M0.1 | Proposed, **not implemented** |
-| Qt/QML shell prototype | milestone M0.2 | Blocked on ADR-0004 approval |
+| Build environment setup | ADR-0003 + milestone M0.1 | Implemented; see CI results before claiming it works |
+| Qt/QML shell prototype | milestone M0.2 | Not started (starts after M0.1 passes) |
 | Moon Browser integration checklist | integrations/moon-browser/ | Written; blocked on source |
 
 ## Smallest useful deliverable: M0.1 — console ISO prototype
@@ -30,32 +30,37 @@ that boots to a shell in QEMU (UEFI and BIOS) and in VMware Workstation.**
 It has no desktop, installer, or branding artwork. Those depend on decisions
 still awaiting approval. Every later milestone builds on this pipeline.
 
-### Proposed contents
+### Contents (implemented 2026-10-19)
 
 ```
 distro/archiso/
-  ARCHISO_VERSION          # archiso version the profile was copied from
-  staros/                  # profile: unchanged releng copy, then Star OS commits
-    profiledef.sh          #   iso_name=staros, label, publisher, application
-    pacman.conf            #   repositories pinned to the baseline date
-    packages.x86_64
-    airootfs/etc/os-release                    # NAME="Star OS", ID=staros, ID_LIKE=arch
+  ARCHISO_VERSION                  # archiso version the overlay is validated against
+  staros/                          # Star OS overlay on top of releng (ADR-0001)
+    profiledef.append.sh           #   iso_name=staros, label, publisher, application
+    airootfs/etc/staros-release    #   Star OS identity (os-release format, ID=staros)
+    airootfs/etc/motd              #   prototype warning
     airootfs/etc/systemd/system/staros-boot-check.service
-    airootfs/usr/local/libexec/staros-boot-check  # prints a boot marker + summary
-    (boot loader configs: titles changed to "Star OS live (prototype)",
-     serial console added to the kernel command line for automated tests)
-distro/baseline/ARCH_SNAPSHOT_DATE
-scripts/build-iso.sh       # checks host + archiso version, runs mkarchiso,
-                           # writes SHA256SUMS and the package manifest
-scripts/test-iso-qemu.sh   # boots the ISO headless (OVMF / SeaBIOS), waits for
-                           # the marker on the serial console, saves the log
-.github/workflows/iso.yml  # lint → build (archlinux container) → boot tests
+    airootfs/usr/local/libexec/staros-boot-check   # boot report + marker on serial
+distro/baseline/ARCH_SNAPSHOT_DATE  # package baseline date (ADR-0002)
+distro/baseline/packages.x86_64.txt # recorded package list (added after the first CI build)
+scripts/build-iso.sh                # host and version checks, profile assembly, mkarchiso, records
+scripts/ci/prepare-arch-build-host.sh   # pins a throwaway Arch container to the baseline
+scripts/ci/check-package-manifest.sh    # T0-05
+tests/iso/boot_test.py              # QEMU boot test (OVMF / SeaBIOS), read-only ISO, no disks
+tests/iso/test_boot_test.py         # unit tests for the boot test
+.github/workflows/iso.yml           # lint → build → package check + boot tests
 docs/development/building.md
 ```
 
-The first commit of `distro/archiso/staros/` is an **unchanged copy** of
-`releng` from the recorded archiso version. Every Star OS change is a separate
-commit (ADR-0001).
+The profile is assembled at build time rather than committed as a full copy.
+ADR-0001's implementation note explains why.
+
+**Change to acceptance criterion 4:** the live system's `/etc/os-release` stays
+Arch's. That file belongs to Arch's `filesystem` package. Overwriting it from
+the archiso overlay would make package installation fail on a file conflict,
+and replacing it properly needs a Star OS package, which needs the Star OS
+repository (Phase 1). Until then, Star OS identity is carried by the boot menu
+titles and `/etc/staros-release`.
 
 ### Acceptance criteria
 
@@ -68,7 +73,8 @@ commit (ADR-0001).
 3. The CI-built ISO boots in QEMU with OVMF (UEFI) and with SeaBIOS (BIOS) and
    prints the boot marker on the serial console within the timeout. Logs are
    uploaded whether the boot passes or fails.
-4. The live environment identifies itself as Star OS (boot menu, `/etc/os-release`).
+4. The live environment identifies itself as Star OS (boot menu titles in the
+   assembled profile, `ID=staros` in `/etc/staros-release`, reported at boot).
 5. All shell scripts pass `shellcheck`.
 6. **Owner-run:** the same CI-built ISO boots to a shell in VMware Workstation
    (UEFI, Secure Boot off), recorded in the

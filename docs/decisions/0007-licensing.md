@@ -1,6 +1,6 @@
 # ADR-0007: Licensing of original components
 
-- Status: Proposed — **owner decision required**
+- Status: Accepted
 - Date: 2026-10-19
 - Deciders: project owner
 
@@ -41,5 +41,5 @@ meant for third-party apps, they can be released under LGPL-3.0-or-later.
 
 ## Approval
 
-- Chosen license: pending owner decision
-- Approved by: pending
+- Chosen: GPL-3.0-or-later for original code, CC-BY-SA-4.0 for documentation, separate artwork/trademark policy (to be written). The DCO sign-off for contributions is still a proposal.
+- Approved by: project owner (GitHub @Jayyy-tuff), 2026-10-19, in the AI agent session

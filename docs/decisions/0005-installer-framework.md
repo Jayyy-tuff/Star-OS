@@ -1,8 +1,8 @@
 # ADR-0005: Installer framework
 
-- Status: Proposed
+- Status: Accepted
 - Date: 2026-10-19
-- Deciders: pending owner approval
+- Deciders: project owner
 
 ## Context
 
@@ -31,7 +31,7 @@ understandable errors with log access.
    re-implementing partitioning, encryption, and bootloader logic where bugs
    destroy data. Highest risk.
 
-## Decision (proposed)
+## Decision
 
 Use **Calamares**, packaged in the Star OS repository at a recorded version,
 with:
@@ -67,4 +67,4 @@ and a disk with existing data). These are release-blocking tests.
 
 ## Approval
 
-- Approved by: pending
+- Approved by: project owner (GitHub @Jayyy-tuff), 2026-10-19, in the AI agent session (Calamares)

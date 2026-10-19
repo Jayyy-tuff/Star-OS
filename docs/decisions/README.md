@@ -19,13 +19,13 @@ release decisions require explicit human approval before they become
 
 | ADR | Title | Status |
 | --- | --- | --- |
-| [0001](0001-arch-base-and-archiso.md) | Arch Linux base and archiso for live/installation media | Proposed |
-| [0002](0002-package-baseline.md) | Package baseline pinned to Arch Linux Archive snapshots | Proposed |
-| [0003](0003-build-and-test-infrastructure.md) | Build and test infrastructure | Proposed |
-| [0004](0004-compositor-and-shell-foundation.md) | Wayland compositor and shell foundation | Proposed |
-| [0005](0005-installer-framework.md) | Installer framework | Proposed |
+| [0001](0001-arch-base-and-archiso.md) | Arch Linux base and archiso for live/installation media | Accepted |
+| [0002](0002-package-baseline.md) | Package baseline pinned to Arch Linux Archive snapshots | Accepted |
+| [0003](0003-build-and-test-infrastructure.md) | Build and test infrastructure | Accepted |
+| [0004](0004-compositor-and-shell-foundation.md) | Wayland compositor and shell foundation | Accepted (KWin) |
+| [0005](0005-installer-framework.md) | Installer framework | Accepted (Calamares) |
 | [0006](0006-boot-snapshots-secure-boot.md) | Bootloader, Btrfs snapshots, and Secure Boot | Deferred to Phase 2 |
-| [0007](0007-licensing.md) | Licensing of original components | Proposed — owner decision required |
+| [0007](0007-licensing.md) | Licensing of original components | Accepted (GPL-3.0-or-later) |
 
 ## Template
 

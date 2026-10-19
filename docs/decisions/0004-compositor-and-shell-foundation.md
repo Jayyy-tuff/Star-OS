@@ -1,8 +1,8 @@
 # ADR-0004: Wayland compositor and shell foundation
 
-- Status: Proposed
+- Status: Accepted
 - Date: 2026-10-19
-- Deciders: pending owner approval
+- Deciders: project owner
 
 ## Context
 
@@ -109,7 +109,7 @@ OS QML surface inside the same compositor session. That keeps switching fast
 | Integration work for Star OS | Lowest | Medium | High | Medium | Very high |
 | Idle resource cost | Highest *(measure)* | High *(measure)* | Lowest | Unknown | Unknown |
 
-## Decision (proposed)
+## Decision
 
 **Use KWin as the compositor.** Start with **option A** (Star OS shell
 package on `plasmashell`), keeping Star OS logic in its own QML modules and
@@ -149,4 +149,4 @@ Plasma's newer Plasma Login Manager reportedly offers less theming *(verify)*.
 
 ## Approval
 
-- Approved by: pending
+- Approved by: project owner (GitHub @Jayyy-tuff), 2026-10-19, in the AI agent session (KWin). Shell hosting (option A or B) is still decided by the M0.2 prototype
