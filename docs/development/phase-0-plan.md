@@ -84,6 +84,23 @@ titles and `/etc/staros-release`.
 M0.1 is done when 1–5 pass in CI and 6 is recorded. Until 6 is recorded, the
 README says "boots in QEMU (CI)" and nothing about VMware.
 
+### Status (2026-10-19)
+
+First CI run: [ISO run #1](https://github.com/Jayyy-tuff/Star-OS/actions/runs/39315730622)
+on commit `27a290a`.
+
+| Criterion | Result |
+| --- | --- |
+| 1. CI builds the ISO and uploads records | **Pass.** archiso 91-1, snapshot 2026-10-15, 455 packages, `staros-2026.10.19-x86_64.iso` (1.6 GB, SHA-256 `ae30cbcc…50e7fb`), build step about 9 minutes |
+| 2. Pinned package inputs | Package list recorded in `distro/baseline/packages.x86_64.txt`. The comparison (T0-05) runs from the next build on |
+| 3. QEMU boot, UEFI and BIOS | **Pass.** UEFI: `id=staros firmware=uefi kernel=7.2.9-arch1-1`, marker 43 s after QEMU start. BIOS: same with `firmware=bios`, 32 s. KVM on GitHub-hosted runners. The harness correctly failed a non-bootable image (T0-09) |
+| 4. Star OS identity | `id=staros` reported at boot. The boot-title renaming step ran. From the next build, the renamed entries are printed in the build records |
+| 5. shellcheck | **Pass** |
+| 6. VMware Workstation boot | **Not yet run.** Owner action, see the [test plan](test-plan.md#manual-procedure-vmware-workstation-boot-t0-10--t0-11) |
+
+The boot times are measured in CI QEMU from QEMU start to the marker. They are
+not performance claims for any real machine.
+
 ### Explicitly out of scope for M0.1
 
 Graphical session, installer, accounts, Secure Boot, ISO signing, a Star OS

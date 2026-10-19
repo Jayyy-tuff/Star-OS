@@ -6,18 +6,25 @@ everyday computing, and recoverability.
 
 ## Current status: Phase 0 (feasibility and architecture)
 
-**Nothing has been shown to build, boot, or install yet.** Milestone M0.1 (a
-console-only live ISO, built and boot-tested in CI) is implemented, but no
-passing CI run has been recorded. No hardware and no VMware Workstation boot
-has been tested. This README claims a capability only once a recorded test
-shows it.
+What has been tested:
+
+- **Builds in CI:** a console-only live ISO, built by GitHub Actions from this
+  repository with packages pinned to the Arch Linux Archive snapshot of
+  2026-10-15.
+- **Boots in QEMU (CI):** that ISO boots to its live environment in QEMU with
+  UEFI (OVMF) and with BIOS (SeaBIOS).
+
+What has **not** been tested: VMware Workstation, any real hardware, any
+installation (there is no installer yet), and any graphical session (there is
+none yet). This README claims a capability only once a recorded test shows it.
+Prototype ISOs are unsigned test artifacts.
 
 What exists today:
 
 | Area | Document | State |
 | --- | --- | --- |
 | Build environment inspection | [docs/development/environment-report-2026-10-19.md](docs/development/environment-report-2026-10-19.md) | Done |
-| Phase 0 plan and first milestone | [docs/development/phase-0-plan.md](docs/development/phase-0-plan.md) | M0.1 approved and implemented; awaiting CI results |
+| Phase 0 plan and first milestone | [docs/development/phase-0-plan.md](docs/development/phase-0-plan.md) | M0.1: CI build and QEMU boot pass; VMware test pending |
 | Building and boot-testing the ISO | [docs/development/building.md](docs/development/building.md) | Draft |
 | Architecture decision records | [docs/decisions/](docs/decisions/README.md) | Mostly accepted; ADR-0006 deferred to Phase 2 |
 | Test plan | [docs/development/test-plan.md](docs/development/test-plan.md) | Draft |

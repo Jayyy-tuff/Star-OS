@@ -8,8 +8,9 @@
 # (ADR-0001), with packages pinned to the baseline snapshot (ADR-0002). Must run
 # as root on Arch Linux; see docs/development/building.md.
 #
-# Writes to out/: the ISO, SHA256SUMS, packages.x86_64.txt, build-info.txt and
-# profile.tar.gz (the assembled profile, for review). Scratch space is build/.
+# Writes to out/: the ISO, SHA256SUMS, packages.x86_64.txt, build-info.txt,
+# boot-entries.txt and profile.tar.gz (the assembled profile, for review).
+# Scratch space is build/.
 
 set -euo pipefail
 # shellcheck source=scripts/lib/common.sh
@@ -50,20 +51,31 @@ pin_repositories() {
 }
 
 retitle_boot_entries() {
-    local profile=$1 file count total=0
+    local profile=$1 file count uefi=0 bios=0
     local -a files
-    mapfile -t files < <(find "$profile/efiboot" "$profile/syslinux" "$profile/grub" \
+    mapfile -t files < <(find "$profile/efiboot" "$profile/grub" "$profile/syslinux" \
         -type f \( -name '*.conf' -o -name '*.cfg' \) 2>/dev/null | sort)
     for file in "${files[@]}"; do
         count=$(grep -c -- "$boot_title_from" "$file" || true)
         ((count > 0)) || continue
         sed -i "s/$boot_title_from/$boot_title_to/g" "$file"
-        total=$((total + count))
+        case $file in
+            "$profile"/syslinux/*) bios=$((bios + count)) ;;
+            *) uefi=$((uefi + count)) ;;
+        esac
     done
-    ((total > 0)) \
-        || die "no boot menu entries contain '$boot_title_from'; review the releng format before building"
-    log "Boot menu entries renamed ($total):"
-    grep -rn -- "$boot_title_to" "${files[@]}" | sed "s|^$profile/|    |"
+    ((uefi > 0 && bios > 0)) \
+        || die "expected to rename UEFI and BIOS boot entries containing '$boot_title_from'," \
+               "renamed $uefi UEFI and $bios BIOS entries; review the releng format before building"
+    grep -rn -- "$boot_title_to" "${files[@]}" | sed "s|^$profile/||" >"$build_dir/boot-entries.txt"
+    log "Boot menu entries renamed ($uefi UEFI, $bios BIOS)"
+}
+
+# Prints the profile's boot modes as mkarchiso will read them.
+profile_bootmodes() {
+    # shellcheck disable=SC2016
+    bash -c 'declare -A file_permissions; source "$1/profiledef.sh"; printf "%s\n" "${bootmodes[*]}"' \
+        _ "$1" 2>/dev/null
 }
 
 assemble_profile() {
@@ -87,11 +99,13 @@ write_records() {
     pacman -Q --dbpath "$work/x86_64/airootfs/var/lib/pacman" >"$out_dir/packages.x86_64.txt"
     (cd -- "$out_dir" && sha256sum -- "$iso" >SHA256SUMS)
     tar -C "$build_dir" -czf "$out_dir/profile.tar.gz" profile
+    cp -- "$build_dir/boot-entries.txt" "$out_dir/boot-entries.txt"
     {
         printf 'iso=%s\n' "$iso"
         printf 'git_commit=%s\n' "$commit"
         printf 'arch_snapshot_date=%s\n' "$baseline"
         printf 'archiso=%s\n' "$(pacman -Q archiso)"
+        printf 'bootmodes=%s\n' "$(profile_bootmodes "$build_dir/profile")"
         printf 'source_date_epoch=%s\n' "$SOURCE_DATE_EPOCH"
         printf 'built_at=%s\n' "$(date -u +%FT%TZ)"
         printf 'build_host_kernel=%s\n' "$(uname -r)"
@@ -117,6 +131,8 @@ main() {
     write_records "$work" "$baseline"
     log "Build records:"
     cat -- "$out_dir/build-info.txt"
+    log "Boot menu entries:"
+    sed 's/^/    /' -- "$out_dir/boot-entries.txt"
     cat -- "$out_dir/SHA256SUMS"
 }
 

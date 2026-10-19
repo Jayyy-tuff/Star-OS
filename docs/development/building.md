@@ -19,7 +19,8 @@ It writes these files to `out/`:
 | `staros-<date>-x86_64.iso` | The live ISO (unsigned test artifact) |
 | `SHA256SUMS` | Checksum of the ISO |
 | `packages.x86_64.txt` | Every package in the live system, with versions |
-| `build-info.txt` | Commit, baseline date, archiso version, timestamps |
+| `build-info.txt` | Commit, baseline date, archiso version, boot modes, timestamps |
+| `boot-entries.txt` | Boot menu entries after renaming |
 | `profile.tar.gz` | The assembled profile, for review |
 
 ## In CI (the system of record)
