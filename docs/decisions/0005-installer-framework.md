@@ -21,8 +21,10 @@ understandable errors with log access.
    KPMcore, LUKS encryption, Btrfs subvolumes, user creation, and bootloader
    installation. Many Arch derivatives already use it. GPL-3.0-or-later. Active:
    the 3.4 series was released through 2026, and the project moved its
-   releases from GitHub to Codeberg. As far as known it is **not** in Arch's
-   official repositories *(verify)*, so Star OS would package it.
+   releases from GitHub to Codeberg. It is **not** in Arch's official
+   repositories: the "Inspect KDE baseline" CI probe found no `calamares`
+   package in the 2026-10-15 snapshot, while `kpmcore` 26.08.2 is there. Star
+   OS must therefore package Calamares itself.
 2. **archinstall** — Arch's official guided installer (Python, text UI), also
    usable as a library. Arch-native logic, but no graphical UI. A Star OS QML
    front end over the archinstall library would be a new, privileged
