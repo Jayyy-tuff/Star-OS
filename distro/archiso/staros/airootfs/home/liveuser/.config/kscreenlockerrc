@@ -1,0 +1,5 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Live medium (M0.2): the live user has no password, so the screen never locks.
+[Daemon]
+Autolock=false
+LockOnResume=false

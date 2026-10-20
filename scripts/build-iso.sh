@@ -1,16 +1,17 @@
 #!/usr/bin/env bash
 # SPDX-License-Identifier: GPL-3.0-or-later
 #
-# Builds the Star OS live ISO prototype (milestone M0.1).
+# Builds the Star OS live ISO prototype (milestones M0.1 and M0.2).
 #
 # The archiso profile is assembled from the releng profile of the installed,
 # pinned archiso version plus the Star OS overlay in distro/archiso/staros/
-# (ADR-0001), with packages pinned to the baseline snapshot (ADR-0002). Must run
-# as root on Arch Linux; see docs/development/building.md.
+# (ADR-0001) and the Star OS shell files in shell/ (ADR-0008), with packages
+# pinned to the baseline snapshot (ADR-0002). Must run as root on Arch Linux;
+# see docs/development/building.md.
 #
 # Writes to out/: the ISO, SHA256SUMS, packages.x86_64.txt, build-info.txt,
-# boot-entries.txt and profile.tar.gz (the assembled profile, for review).
-# Scratch space is build/.
+# boot-entries.txt, image-policy.txt and profile.tar.gz (the assembled
+# profile, for review). Scratch space is build/.
 
 set -euo pipefail
 # shellcheck source=scripts/lib/common.sh
@@ -19,6 +20,7 @@ source "$(dirname -- "${BASH_SOURCE[0]}")/lib/common.sh"
 build_dir="$staros_repo_root/build"
 out_dir="$staros_repo_root/out"
 overlay_dir="$staros_repo_root/distro/archiso/staros"
+shell_src="$staros_repo_root/shell"
 releng_dir=/usr/share/archiso/configs/releng
 mirrorlist_include_re='^Include[[:space:]]*=[[:space:]]*/etc/pacman\.d/mirrorlist[[:space:]]*$'
 boot_title_from='Arch Linux install medium'
@@ -78,12 +80,70 @@ profile_bootmodes() {
         _ "$1" 2>/dev/null
 }
 
+# Lines of a list file without comments and blank lines.
+list_entries() {
+    grep -vE '^[[:space:]]*(#|$)' -- "$1" | sed -E 's/[[:space:]]+$//'
+}
+
+# Deletes the releng paths listed in releng-remove.txt. A missing path means
+# releng changed, which needs a review, so the build stops.
+remove_releng_paths() {
+    local profile=$1 path
+    while IFS= read -r path; do
+        [[ $path != /* && $path != *..* ]] || die "releng-remove.txt: invalid path '$path'"
+        [[ -e $profile/$path || -L $profile/$path ]] \
+            || die "releng-remove.txt lists '$path', which releng no longer has; review releng"
+        rm -f -- "$profile/$path"
+        log "Removed releng path $path"
+    done < <(list_entries "$overlay_dir/releng-remove.txt")
+}
+
+# Appends the Star OS packages that releng does not already list.
+append_packages() {
+    local list=$1 pkg added=0
+    while IFS= read -r pkg; do
+        if grep -qxF -- "$pkg" "$list"; then
+            log "Package $pkg is already in releng's list"
+        else
+            printf '%s\n' "$pkg" >>"$list"
+            added=$((added + 1))
+        fi
+    done < <(list_entries "$overlay_dir/packages.x86_64.append")
+    log "Appended $added packages to the profile's package list"
+}
+
+# Copies the Star OS shell (QML module and Plasma packages) into the image.
+# These are new paths that no package owns; licence sidecars stay in git.
+install_shell_files() {
+    local airootfs=$1
+    mkdir -p -- "$airootfs/usr/lib/qt6/qml" "$airootfs/usr/share/plasma/shells" \
+        "$airootfs/usr/share/plasma/plasmoids"
+    cp -a -- "$shell_src/qml/StarOS" "$airootfs/usr/lib/qt6/qml/"
+    cp -a -- "$shell_src/plasma/shells/." "$airootfs/usr/share/plasma/shells/"
+    cp -a -- "$shell_src/plasma/plasmoids/." "$airootfs/usr/share/plasma/plasmoids/"
+    find "$airootfs/usr/lib/qt6/qml/StarOS" "$airootfs/usr/share/plasma" \
+        -name '*.license' -type f -delete
+    log "Installed Star OS shell files ($(find "$airootfs/usr/lib/qt6/qml/StarOS" \
+        "$airootfs/usr/share/plasma" -type f | wc -l) files)"
+}
+
+# A hash over the installed shell tree (paths and contents), for build records.
+shell_tree_hash() {
+    local airootfs=$1
+    (cd -- "$airootfs" && find usr/lib/qt6/qml/StarOS usr/share/plasma/shells/org.staros.shell \
+        usr/share/plasma/plasmoids/org.staros.taskbar usr/share/plasma/plasmoids/org.staros.desktop \
+        -type f -print0 | LC_ALL=C sort -z | xargs -0 sha256sum) | sha256sum | cut -d' ' -f1
+}
+
 assemble_profile() {
     local profile=$1
     rm -rf -- "$profile"
     mkdir -p -- "$(dirname -- "$profile")"
     cp -a -- "$releng_dir" "$profile"
+    remove_releng_paths "$profile"
     cp -a -- "$overlay_dir/airootfs/." "$profile/airootfs/"
+    append_packages "$profile/packages.x86_64"
+    install_shell_files "$profile/airootfs"
     cat -- "$overlay_dir/profiledef.append.sh" >>"$profile/profiledef.sh"
     pin_repositories "$profile/pacman.conf"
     retitle_boot_entries "$profile"
@@ -102,6 +162,7 @@ write_records() {
     cp -- "$build_dir/boot-entries.txt" "$out_dir/boot-entries.txt"
     {
         printf 'iso=%s\n' "$iso"
+        printf 'iso_bytes=%s\n' "$(stat -c %s -- "${isos[0]}")"
         printf 'git_commit=%s\n' "$commit"
         printf 'arch_snapshot_date=%s\n' "$baseline"
         printf 'archiso=%s\n' "$(pacman -Q archiso)"
@@ -110,6 +171,7 @@ write_records() {
         printf 'built_at=%s\n' "$(date -u +%FT%TZ)"
         printf 'build_host_kernel=%s\n' "$(uname -r)"
         printf 'iso_package_count=%s\n' "$(wc -l <"$out_dir/packages.x86_64.txt")"
+        printf 'staros_shell_sha256=%s\n' "$(shell_tree_hash "$work/x86_64/airootfs")"
     } >"$out_dir/build-info.txt"
 }
 
@@ -128,7 +190,14 @@ main() {
     log "Running mkarchiso"
     mkarchiso -v -w "$work" -o "$out_dir" "$profile"
 
+    log "Disk space after mkarchiso:"
+    df -h -- "$build_dir" "$out_dir" | sed 's/^/    /'
+    log "Checking the image policy"
+    "$staros_repo_root/scripts/ci/check-image-policy.sh" "$work/x86_64/airootfs" \
+        "$build_dir/image-policy.txt"
+
     write_records "$work" "$baseline"
+    cp -- "$build_dir/image-policy.txt" "$out_dir/image-policy.txt"
     log "Build records:"
     cat -- "$out_dir/build-info.txt"
     log "Boot menu entries:"

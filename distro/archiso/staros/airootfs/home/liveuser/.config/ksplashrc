@@ -1,0 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Live medium (M0.2): no splash screen, so nothing hides a startup hang.
+[KSplash]
+Engine=none

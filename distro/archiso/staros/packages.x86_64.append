@@ -18,6 +18,7 @@ noto-fonts
 # Applications in the curated M0.2 launcher catalogue.
 konsole
 systemsettings
+kmenuedit
 # Screen reader and audio.
 orca
 speech-dispatcher

@@ -1,0 +1,14 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Default containments of the Star OS prototype shell (M0.2). No toolboxes
+# and no containment actions: there is no Plasma edit mode or desktop menu.
+[Desktop]
+Containment=org.staros.desktop
+ToolBox=
+
+[Desktop][ContainmentActions]
+
+[Panel]
+Containment=org.staros.taskbar
+ToolBox=
+
+[Panel][ContainmentActions]

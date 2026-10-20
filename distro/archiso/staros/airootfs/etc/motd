@@ -1,9 +1,12 @@
+Star OS live environment - prototype M0.2
 
-Star OS live environment - prototype M0.1
+This is an unsigned test build of the Star OS shell prototype. It has no
+Star OS installer yet. It is built from the Arch Linux live environment, so
+Arch tools such as archinstall are present, but they are not the Star OS
+installer.
 
-This is an unsigned test build. It has no desktop and no Star OS installer
-yet. It is built from the Arch Linux live environment, so Arch tools such as
-archinstall are present, but they are not the Star OS installer.
+The live user 'liveuser' has no password and can use sudo. Root is locked.
+Session report: sudo journalctl -b -u staros-session-report -o cat
 
 Do not use this image to install a system you depend on.
 Report what you find: https://github.com/Jayyy-tuff/Star-OS/issues

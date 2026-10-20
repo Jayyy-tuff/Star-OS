@@ -3,3 +3,5 @@ out/
 boot-logs/
 selftest/
 __pycache__/
+idle-logs/
+idle/

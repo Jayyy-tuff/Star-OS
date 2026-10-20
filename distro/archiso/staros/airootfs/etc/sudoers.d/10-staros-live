@@ -1,0 +1,5 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Live medium only; the Phase 2 installer must not copy this file.
+# Root is locked on the live medium, so this is the owner's elevation path for
+# diagnostics (ADR-0008, docs/security/threat-model.md).
+liveuser ALL=(ALL:ALL) NOPASSWD: ALL

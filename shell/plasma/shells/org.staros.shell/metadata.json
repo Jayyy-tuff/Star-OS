@@ -1,0 +1,19 @@
+{
+    "KPackageStructure": "Plasma/Shell",
+    "KPlugin": {
+        "Authors": [
+            {
+                "Name": "Star OS project"
+            }
+        ],
+        "Description": "Star OS prototype shell (M0.2): taskbar and full-screen launcher",
+        "Id": "org.staros.shell",
+        "License": "GPL-3.0-or-later",
+        "Name": "Star OS shell (prototype)",
+        "Version": "0.2",
+        "Website": "https://github.com/Jayyy-tuff/Star-OS"
+    },
+    "X-KDE-ParentApp": "org.kde.plasmashell",
+    "X-Plasma-APIVersion": "2",
+    "X-Plasma-FallbackPackage": "org.kde.plasma.desktop"
+}

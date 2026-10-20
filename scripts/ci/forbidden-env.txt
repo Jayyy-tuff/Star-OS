@@ -1,0 +1,12 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Environment variables that must never appear in the Star OS image, its shell
+# sources or any CI step that runs the shell (ADR-0008). They bypass KWin's
+# Wayland permission checks, force Qt's accessibility bridge on, or change
+# KWin's compositing backend, so a check passing with them proves nothing about
+# the shipped session. Read by check-forbidden-env.sh (repository),
+# check-image-policy.sh (built image) and tests/iso/boot_test.py (running
+# session). One name per line.
+KWIN_WAYLAND_NO_PERMISSION_CHECKS
+KWIN_SCREENSHOT_NO_PERMISSION_CHECKS
+QT_LINUX_ACCESSIBILITY_ALWAYS_ON
+KWIN_COMPOSE

@@ -1,0 +1,11 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Star OS shell UI module (M0.2, ADR-0008): host-independent, imports only
+# QtQuick and QtQuick.Templates, so it is unit-tested without Plasma.
+module StarOS.Shell
+singleton Theme 1.0 Theme.qml
+FocusFrame 1.0 FocusFrame.qml
+ShellButton 1.0 ShellButton.qml
+TaskButton 1.0 TaskButton.qml
+Taskbar 1.0 Taskbar.qml
+LauncherTile 1.0 LauncherTile.qml
+Launcher 1.0 Launcher.qml

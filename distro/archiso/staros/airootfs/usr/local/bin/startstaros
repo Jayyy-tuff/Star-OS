@@ -1,0 +1,17 @@
+#!/bin/sh
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Star OS prototype session (M0.2, ADR-0004 option A, ADR-0008): Plasma's Wayland
+# startup with plasmashell loading the Star OS shell package (the Plasma Mobile
+# pattern). Sets no test or permission-bypass variables; see
+# scripts/ci/check-image-policy.sh.
+export PLASMA_DEFAULT_SHELL=org.staros.shell
+
+# archiso 'speech' boot entries (accessibility=on): kaccess starts Orca at login
+# when kaccessrc [ScreenReader] Enabled=true. Applied once per boot, so that a
+# later Meta+Alt+S toggle-off survives a re-login.
+if grep -qw accessibility=on /proc/cmdline && [ ! -e /tmp/staros-a11y-applied ]; then
+    kwriteconfig6 --file kaccessrc --group ScreenReader --key Enabled true \
+        && : >/tmp/staros-a11y-applied
+fi
+
+exec /usr/bin/startplasma-wayland

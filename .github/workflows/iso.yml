@@ -1,7 +1,9 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 #
-# Milestone M0.1: lint -> build the live ISO in a pinned Arch container ->
-# boot it in QEMU (UEFI and BIOS) and compare its packages with the baseline.
+# Milestones M0.1 and M0.2: lint -> build the live ISO in a pinned Arch
+# container -> boot it in QEMU (UEFI and BIOS) into the Star OS prototype
+# session, measure the idle session three times, and compare its packages with
+# the baseline. The Star OS shell's QML unit tests run in parallel with the build.
 # Test IDs refer to docs/development/test-plan.md.
 
 name: ISO
@@ -40,14 +42,58 @@ jobs:
         run: |
           shellcheck --version
           shellcheck --external-sources \
-            scripts/*.sh scripts/lib/*.sh scripts/ci/*.sh \
+            scripts/*.sh scripts/lib/*.sh scripts/ci/*.sh tests/shell/*.sh \
             distro/archiso/staros/profiledef.append.sh \
-            distro/archiso/staros/airootfs/usr/local/libexec/staros-boot-check
-      - name: Boot test harness unit tests
+            distro/archiso/staros/airootfs/usr/local/libexec/staros-boot-check \
+            distro/archiso/staros/airootfs/usr/local/bin/startstaros
+      - name: Harness unit tests (boot test, session report format, screen, idle summary)
         run: python3 -m unittest discover -s tests/iso -v
+      - name: Session report compiles
+        run: |
+          python3 -c 'import sys; compile(open(sys.argv[1]).read(), sys.argv[1], "exec")' \
+            distro/archiso/staros/airootfs/usr/local/libexec/staros-session-report
+      - name: No forbidden environment variables (ADR-0008)
+        run: scripts/ci/check-forbidden-env.sh
+      - name: Shell sources (metadata, licences, no private Plasma API)
+        run: python3 tests/shell/check_shell_sources.py
+      - name: Session entry is a valid desktop file
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends desktop-file-utils
+          desktop-file-validate distro/archiso/staros/airootfs/usr/share/wayland-sessions/staros.desktop
       - name: Record source date epoch
         id: epoch
         run: echo "value=$(git log -1 --format=%ct)" >> "$GITHUB_OUTPUT"
+
+  shell-checks:
+    name: Shell unit tests at 100/150/200% (T0-20)
+    needs: lint
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    container:
+      image: archlinux:latest
+    steps:
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+      - name: Prepare pinned Arch host with Qt and Plasma libraries
+        shell: bash
+        env:
+          STAROS_DISPOSABLE_HOST: "1"
+        run: |
+          scripts/ci/prepare-arch-build-host.sh python qt6-declarative kpackage libplasma \
+            plasma-workspace kitemmodels layer-shell-qt noto-fonts
+      - name: Shell sources
+        run: python3 tests/shell/check_shell_sources.py
+      - name: qmllint, kpackagetool6 and qmltestrunner at three scale factors
+        shell: bash
+        run: tests/shell/run-qml-tests.sh build/qml-tests
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5.0.0
+        with:
+          name: shell-test-results
+          path: build/qml-tests/
+          retention-days: 30
+          if-no-files-found: warn
 
   build:
     name: Build ISO (T0-02, T0-03)
@@ -65,7 +111,8 @@ jobs:
         shell: bash
         env:
           STAROS_DISPOSABLE_HOST: "1"
-        run: scripts/ci/prepare-arch-build-host.sh
+        # sudo (visudo) and desktop-file-utils are used by the image policy check.
+        run: scripts/ci/prepare-arch-build-host.sh sudo desktop-file-utils
       - name: Build ISO
         shell: bash
         run: scripts/build-iso.sh 2>&1 | tee build.log
@@ -106,7 +153,7 @@ jobs:
         run: scripts/ci/check-package-manifest.sh records/out/packages.x86_64.txt
 
   boot-test:
-    name: Boot test ${{ matrix.firmware }} (T0-04, T0-06..T0-09)
+    name: Boot test ${{ matrix.firmware }} (T0-04, T0-06..T0-09, T0-20)
     needs: build
     runs-on: ubuntu-24.04
     timeout-minutes: 30
@@ -146,14 +193,15 @@ jobs:
             exit 1
           fi
           test -s "selftest/result-${{ matrix.firmware }}.json"
-      - name: Boot ISO (T0-06 UEFI / T0-07 BIOS, T0-08)
+      - name: Boot ISO into the Star OS session (T0-06 UEFI / T0-07 BIOS, T0-08, T0-20)
         shell: bash
         run: |
           shopt -s nullglob
           isos=(iso/*.iso)
           [[ ${#isos[@]} -eq 1 ]] || { echo "expected one ISO, found ${#isos[@]}"; exit 1; }
           python3 tests/iso/boot_test.py --iso "${isos[0]}" --firmware "${{ matrix.firmware }}" \
-            --timeout 300 --log-dir boot-logs --require-kvm
+            --timeout 300 --log-dir boot-logs --require-kvm \
+            --profile graphical --session --session-timeout 480
       - name: Upload boot logs
         if: always()
         uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5.0.0
@@ -163,8 +211,69 @@ jobs:
             boot-logs/*.log
             boot-logs/*.json
             boot-logs/*.ppm
+            boot-logs/*.png
             selftest/*.log
             selftest/*.json
             selftest/*.ppm
           retention-days: 30
           if-no-files-found: warn
+
+  idle:
+    name: Idle session run ${{ matrix.run }} (T0-25)
+    needs: build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    strategy:
+      fail-fast: false
+      matrix:
+        run: [1, 2, 3]
+    steps:
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' \
+            | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - name: Install QEMU and OVMF
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends qemu-system-x86 ovmf
+      - uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5.0.0
+        with:
+          name: staros-iso
+          path: iso
+      - name: Boot and wait for the idle report and stability verdict
+        shell: bash
+        run: |
+          shopt -s nullglob
+          isos=(iso/*.iso)
+          [[ ${#isos[@]} -eq 1 ]] || { echo "expected one ISO, found ${#isos[@]}"; exit 1; }
+          python3 tests/iso/boot_test.py --iso "${isos[0]}" --firmware uefi \
+            --log-dir idle-logs --require-kvm --profile graphical --session --wait-idle \
+            --screen-delay 0
+      - name: Upload idle logs
+        if: always()
+        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5.0.0
+        with:
+          name: idle-run-${{ matrix.run }}
+          path: |
+            idle-logs/*.log
+            idle-logs/*.json
+            idle-logs/*.png
+          retention-days: 30
+          if-no-files-found: warn
+
+  idle-summary:
+    name: Idle summary (T0-25, no threshold)
+    needs: idle
+    if: always()
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+      - uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5.0.0
+        with:
+          pattern: idle-run-*
+          path: idle
+      - name: Median, minimum and maximum
+        run: python3 tests/iso/idle_summary.py idle

@@ -1,0 +1,5 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Live medium (M0.2): no file indexing; kde-baloo.service is skipped by its
+# ExecCondition on this key.
+[Basic Settings]
+Indexing-Enabled=false

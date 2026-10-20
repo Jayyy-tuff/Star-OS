@@ -1,0 +1,16 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Prototype diagnostics (M0.2, ADR-0008): a read-only report of the live session
+# on the journal and the first serial port, read by tests/iso/boot_test.py.
+# Phase 1 removes it or makes it opt-in.
+[Unit]
+Description=Star OS live session report for automated tests
+After=staros-boot-check.service
+
+[Service]
+Type=exec
+ExecStart=/usr/local/libexec/staros-session-report
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=graphical.target

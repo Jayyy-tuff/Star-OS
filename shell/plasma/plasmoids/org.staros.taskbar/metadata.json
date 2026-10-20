@@ -1,0 +1,22 @@
+{
+    "KPackageStructure": "Plasma/Applet",
+    "KPlugin": {
+        "Authors": [
+            {
+                "Name": "Star OS project"
+            }
+        ],
+        "Description": "Star OS prototype taskbar and full-screen launcher",
+        "Id": "org.staros.taskbar",
+        "License": "GPL-3.0-or-later",
+        "Name": "Star OS taskbar",
+        "Version": "0.2",
+        "Website": "https://github.com/Jayyy-tuff/Star-OS"
+    },
+    "NoDisplay": true,
+    "X-Plasma-API-Minimum-Version": "6.0",
+    "X-Plasma-ContainmentType": "Panel",
+    "X-Plasma-Provides": [
+        "org.kde.plasma.launchermenu"
+    ]
+}

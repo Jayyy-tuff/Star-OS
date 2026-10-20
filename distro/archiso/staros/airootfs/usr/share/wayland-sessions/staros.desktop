@@ -1,0 +1,10 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Session entry for the Phase 1 display manager. The M0.2 live medium starts the
+# session through staros-live-session.service and does not use this file.
+[Desktop Entry]
+Type=Application
+Name=Star OS (prototype)
+Comment=Star OS shell prototype on KWin
+Exec=/usr/lib/plasma-dbus-run-session-if-needed /usr/local/bin/startstaros
+TryExec=/usr/local/bin/startstaros
+DesktopNames=KDE

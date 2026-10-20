@@ -1,0 +1,10 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Paths of releng's profile that scripts/build-iso.sh deletes before the Star OS
+# overlay is copied (M0.2, ADR-0008). The build fails if a listed path is
+# missing, so a changed releng profile is reviewed instead of silently ignored.
+# One path per line, relative to the profile root.
+
+# Root autologin on tty1: Star OS logs in the unprivileged live user instead.
+airootfs/etc/systemd/system/getty@tty1.service.d/autologin.conf
+# The desktop live ISO starts no SSH server (the unit is also masked).
+airootfs/etc/systemd/system/multi-user.target.wants/sshd.service

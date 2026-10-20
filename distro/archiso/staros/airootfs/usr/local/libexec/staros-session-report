@@ -1,0 +1,468 @@
+#!/usr/bin/python3 -I
+# SPDX-License-Identifier: GPL-3.0-or-later
+"""Star OS live session report (M0.2 prototype diagnostics, ADR-0008).
+
+Runs as root and only reads: /proc, loginctl, systemctl, the journal and the
+live user's session bus (read-only queries, plus a Plasma script that prints
+the shell layout). It writes to the journal (stdout) and, when present, to the
+first serial port, where tests/iso/boot_test.py reads it.
+
+Phases, all printed as single lines:
+  1. ready   STAROS-SESSION-CHECK ... then STAROS-SESSION-OK or
+             STAROS-SESSION-FAIL reason=... (waits up to READY_TIMEOUT)
+  2. idle    STAROS-IDLE-REPORT {json} then STAROS-IDLE-DONE: samples the
+             live user's processes for IDLE_WINDOW s, starting IDLE_SETTLE s
+             after ready. Nothing else touches the session meanwhile.
+  3. stable  STAROS-SESSION-STABLE or STAROS-SESSION-UNSTABLE reason=... at
+             ready + STABLE_AFTER s: same plasmashell and KWin processes, no
+             service restarts.
+The idle figures describe this virtual machine only; they are not hardware
+or performance claims.
+"""
+
+import json
+import os
+import subprocess
+import sys
+import time
+
+USER = "liveuser"
+UID = 1000
+EXPECTED_SHELL = "org.staros.shell"
+READY_TIMEOUT = 300
+IDLE_SETTLE = 240
+IDLE_WINDOW = 60
+STABLE_AFTER = 330
+TOP_PROCESSES = 12
+SERIAL = "/dev/ttyS0"
+PLASMASHELL_DESKTOP = "/usr/share/applications/org.kde.plasmashell.desktop"
+SHELLRC_PATHS = ("/etc/xdg/plasmashellrc", f"/home/{USER}/.config/plasmashellrc")
+ENV_PREFIXES = ("KWIN_", "QT_", "KDE_", "PLASMA_")
+VERSION_PACKAGES = ("kwin", "plasma-workspace", "qt6-base", "mesa", "linux")
+LAYOUT_SCRIPT = (
+    "print(JSON.stringify({"
+    "panels: panels().map(p => ({type: p.type, location: p.location, height: p.height,"
+    " floating: p.floating})),"
+    "desktops: desktops().map(d => ({type: d.type, wallpaper: d.wallpaperPlugin}))}))"
+)
+USER_ENV = {
+    "PATH": "/usr/bin",
+    "HOME": f"/home/{USER}",
+    "XDG_RUNTIME_DIR": f"/run/user/{UID}",
+    "DBUS_SESSION_BUS_ADDRESS": f"unix:path=/run/user/{UID}/bus",
+    "LANG": "C.UTF-8",
+}
+
+
+def uptime():
+    with open("/proc/uptime") as f:
+        return float(f.read().split()[0])
+
+
+def emit(line):
+    print(line, flush=True)
+    if not os.path.exists(SERIAL):
+        return
+    try:
+        fd = os.open(SERIAL, os.O_WRONLY | os.O_NOCTTY | os.O_NONBLOCK)
+    except OSError:
+        return
+    data = (line + "\n").encode("utf-8", "replace")
+    deadline = time.monotonic() + 10
+    try:
+        while data and time.monotonic() < deadline:
+            try:
+                data = data[os.write(fd, data):]
+            except BlockingIOError:
+                time.sleep(0.05)
+    except OSError:
+        pass  # a machine without a real serial port; the journal has the line
+    finally:
+        os.close(fd)
+
+
+def run(cmd, as_user=False, timeout=20):
+    """Returns (exit status, stdout) of a command; never raises."""
+    kwargs = {}
+    if as_user:
+        kwargs = {"user": UID, "group": UID, "extra_groups": [], "env": USER_ENV, "cwd": "/"}
+    try:
+        out = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout,
+                             check=False, **kwargs)
+    except (OSError, subprocess.SubprocessError) as err:
+        return 127, str(err)
+    return out.returncode, out.stdout
+
+
+def busctl_json(args):
+    """Runs busctl --user --json=short as the live user; returns the 'data' or None."""
+    status, out = run(["busctl", "--user", "--json=short"] + args, as_user=True)
+    if status != 0 or not out.strip():
+        return None
+    try:
+        return json.loads(out)["data"]
+    except (ValueError, KeyError, TypeError):
+        return None
+
+
+def session_facts():
+    """Returns logind facts of the live user's session, or {}."""
+    status, out = run(["loginctl", "show-user", USER, "-p", "Sessions", "--value"])
+    if status != 0:
+        return {}
+    for session in out.split():
+        status, props = run(["loginctl", "show-session", session,
+                             "-p", "Type", "-p", "Seat", "-p", "VTNr", "-p", "State",
+                             "-p", "Class", "-p", "Service"])
+        if status != 0:
+            continue
+        facts = dict(line.split("=", 1) for line in props.splitlines() if "=" in line)
+        if facts.get("Seat") == "seat0":
+            facts["Id"] = session
+            return facts
+    return {}
+
+
+def unit_facts(unit, user=False):
+    cmd = ["systemctl"] + (["--user"] if user else []) + [
+        "show", unit, "-p", "MainPID", "-p", "NRestarts", "-p", "ActiveState"]
+    status, out = run(cmd, as_user=user)
+    if status != 0:
+        return {}
+    return dict(line.split("=", 1) for line in out.splitlines() if "=" in line)
+
+
+def uid_pids(uid=UID):
+    pids = []
+    for name in os.listdir("/proc"):
+        if not name.isdigit():
+            continue
+        try:
+            with open(f"/proc/{name}/status") as f:
+                for line in f:
+                    if line.startswith("Uid:"):
+                        if int(line.split()[1]) == uid:
+                            pids.append(int(name))
+                        break
+        except (OSError, ValueError):
+            continue
+    return sorted(pids)
+
+
+def comm(pid):
+    try:
+        with open(f"/proc/{pid}/comm") as f:
+            return f.read().strip()
+    except OSError:
+        return None
+
+
+def find_process(name, uid=UID):
+    """Returns the oldest PID of the live user with this comm, or None."""
+    for pid in uid_pids(uid):
+        if comm(pid) == name:
+            return pid
+    return None
+
+
+def environ_names(pid):
+    """Returns the sorted names of selected environment variables of a process."""
+    try:
+        with open(f"/proc/{pid}/environ", "rb") as f:
+            data = f.read()
+    except OSError:
+        return None
+    names = set()
+    for item in data.split(b"\0"):
+        name = item.split(b"=", 1)[0].decode("utf-8", "replace")
+        if name.startswith(ENV_PREFIXES):
+            names.add(name)
+    return sorted(names)
+
+
+def environ_value(pid, key):
+    try:
+        with open(f"/proc/{pid}/environ", "rb") as f:
+            data = f.read()
+    except OSError:
+        return None
+    prefix = key.encode() + b"="
+    for item in data.split(b"\0"):
+        if item.startswith(prefix):
+            return item[len(prefix):].decode("utf-8", "replace")
+    return None
+
+
+def grant_ok():
+    """True if plasmashell's desktop file grants it the window-management global."""
+    try:
+        with open(PLASMASHELL_DESKTOP) as f:
+            for line in f:
+                if line.startswith("X-KDE-Wayland-Interfaces="):
+                    return "org_kde_plasma_window_management" in line
+    except OSError:
+        pass
+    return False
+
+
+def shell_package_override():
+    """Returns the first plasmashellrc that pins a ShellPackage, or None."""
+    for path in SHELLRC_PATHS:
+        try:
+            with open(path) as f:
+                if any(line.strip().startswith("ShellPackage=") for line in f):
+                    return path
+        except OSError:
+            continue
+    return None
+
+
+def renderer():
+    data = busctl_json(["call", "org.kde.KWin", "/KWin", "org.kde.KWin", "supportInformation"])
+    if not data:
+        return None
+    text = data[0] if isinstance(data, list) else str(data)
+    found = {}
+    for line in text.splitlines():
+        key, sep, value = line.partition(":")
+        if sep and key.strip() in ("OpenGL renderer string", "Compositing Type"):
+            found.setdefault(key.strip(), value.strip())
+    return found.get("OpenGL renderer string") or found.get("Compositing Type")
+
+
+def shell_ready_line():
+    status, out = run(["journalctl", "-b", f"_UID={UID}", "-o", "cat", "--no-pager", "-q"],
+                      timeout=30)
+    if status != 0:
+        return None
+    lines = [line.strip() for line in out.splitlines() if "STAROS-SHELL ready" in line]
+    return lines[-1] if lines else None
+
+
+def layout_problems(layout):
+    problems = []
+    panels = [p for p in layout.get("panels", []) if p.get("type") == "org.staros.taskbar"]
+    if not panels:
+        problems.append("no org.staros.taskbar panel")
+    elif panels[0].get("location") != "bottom" or panels[0].get("floating") is not False:
+        problems.append("taskbar panel is not bottom and non-floating")
+    desktops = layout.get("desktops", [])
+    if not desktops or any(d.get("type") != "org.staros.desktop" for d in desktops):
+        problems.append("desktops are not org.staros.desktop")
+    elif any(d.get("wallpaper") != "org.kde.color" for d in desktops):
+        problems.append("desktop wallpaper is not org.kde.color")
+    return problems
+
+
+def wait_ready():
+    """Polls until the Star OS shell is up; returns (ok, facts, reason)."""
+    deadline = time.monotonic() + READY_TIMEOUT
+    facts = {}
+    reason = "timed out"
+    while True:
+        facts = {"session": session_facts()}
+        session = facts["session"]
+        shell = busctl_json(["get-property", "org.kde.plasmashell", "/PlasmaShell",
+                             "org.kde.PlasmaShell", "shell"]) if session else None
+        facts["shell"] = shell
+        layout = None
+        if shell == EXPECTED_SHELL:
+            data = busctl_json(["call", "org.kde.plasmashell", "/PlasmaShell",
+                                "org.kde.PlasmaShell", "evaluateScript", "s", LAYOUT_SCRIPT])
+            if data:
+                try:
+                    layout = json.loads(data[0])
+                except (ValueError, TypeError, IndexError):
+                    layout = None
+        facts["layout"] = layout
+        if not session:
+            reason = "no logind session for the live user on seat0"
+        elif session.get("Type") != "wayland":
+            reason = f"logind session type is {session.get('Type')!r}, not wayland"
+        elif shell is None:
+            reason = "plasmashell is not on the session bus"
+        elif shell != EXPECTED_SHELL:
+            reason = f"plasmashell loaded shell {shell!r}"
+        elif layout is None:
+            reason = "plasmashell did not return the layout"
+        else:
+            problems = layout_problems(layout)
+            if not problems:
+                return True, facts, None
+            reason = "; ".join(problems)
+        if time.monotonic() > deadline:
+            return False, facts, reason
+        time.sleep(5)
+
+
+def check_line(facts, seconds):
+    session = facts.get("session") or {}
+    plasmashell = find_process("plasmashell")
+    kwin = find_process("kwin_wayland")
+    fields = [
+        f"seconds={seconds:.0f}",
+        f"user={USER}",
+        f"logind_type={session.get('Type', 'none')}",
+        f"seat={session.get('Seat', 'none')}",
+        f"vt={session.get('VTNr', 'none')}",
+        f"class={session.get('Class', 'none')}",
+        f"shell={facts.get('shell') or 'none'}",
+        "layout=" + json.dumps(facts.get("layout"), separators=(",", ":"), sort_keys=True),
+        "renderer=" + (renderer() or "unknown").replace(" ", "_"),
+        "grant=" + ("ok" if grant_ok() else "missing"),
+        "shellrc_override=" + (shell_package_override() or "none"),
+        f"plasmashell_pid={plasmashell or 0}",
+        f"kwin_pid={kwin or 0}",
+        "plasma_default_shell=" + ((environ_value(plasmashell, "PLASMA_DEFAULT_SHELL")
+                                    if plasmashell else None) or "unset"),
+    ]
+    for label, pid in (("env_kwin", kwin), ("env_plasmashell", plasmashell)):
+        names = environ_names(pid) if pid else None
+        fields.append(f"{label}=" + (",".join(names) if names else "none"))
+    return "STAROS-SESSION-CHECK " + " ".join(fields)
+
+
+def read_ticks(pid):
+    """Returns utime + stime of a process in clock ticks, or None."""
+    try:
+        with open(f"/proc/{pid}/stat") as f:
+            data = f.read()
+    except OSError:
+        return None
+    fields = data[data.rfind(")") + 2:].split()
+    return int(fields[11]) + int(fields[12])
+
+
+def read_pss_kib(pid):
+    try:
+        with open(f"/proc/{pid}/smaps_rollup") as f:
+            for line in f:
+                if line.startswith("Pss:"):
+                    return int(line.split()[1])
+    except (OSError, ValueError):
+        pass
+    return None
+
+
+def meminfo_mib():
+    values = {}
+    with open("/proc/meminfo") as f:
+        for line in f:
+            key, _, rest = line.partition(":")
+            values[key] = int(rest.split()[0])
+    return round(values["MemTotal"] / 1024), round(
+        (values["MemTotal"] - values["MemAvailable"]) / 1024)
+
+
+def package_versions():
+    status, out = run(["pacman", "-Q"] + list(VERSION_PACKAGES))
+    versions = {}
+    for line in out.splitlines():
+        name, _, version = line.partition(" ")
+        versions[name] = version
+    return versions
+
+
+def idle_report(render):
+    """Samples the live user's processes over IDLE_WINDOW seconds."""
+    tck = os.sysconf("SC_CLK_TCK")
+    start = {pid: read_ticks(pid) for pid in uid_pids()}
+    time.sleep(IDLE_WINDOW)
+    processes = []
+    total_ticks = 0
+    for pid in uid_pids():
+        ticks = read_ticks(pid)
+        pss = read_pss_kib(pid)
+        if ticks is None or pss is None:
+            continue
+        delta = ticks - start[pid] if start.get(pid) is not None else ticks
+        total_ticks += delta
+        processes.append({
+            "comm": comm(pid),
+            "pss_mib": round(pss / 1024, 1),
+            "cpu_pct": round(100 * delta / tck / IDLE_WINDOW, 2),
+        })
+    processes.sort(key=lambda p: p["pss_mib"], reverse=True)
+    mem_total, mem_used = meminfo_mib()
+    listed = processes[:TOP_PROCESSES]
+    rest = processes[TOP_PROCESSES:]
+
+    def pss_of(name):
+        return round(sum(p["pss_mib"] for p in processes if p["comm"] == name), 1)
+
+    status, virt = run(["systemd-detect-virt"])
+    return {
+        "method": "PSS from smaps_rollup and utime+stime deltas of every UID 1000 process",
+        "settle_s": IDLE_SETTLE,
+        "window_s": IDLE_WINDOW,
+        "nproc": os.cpu_count(),
+        "virt": virt.strip() or "none",
+        "renderer": render,
+        "mem_total_mib": mem_total,
+        "mem_used_mib": mem_used,
+        "session_pss_mib": round(sum(p["pss_mib"] for p in processes), 1),
+        "session_cpu_pct": round(100 * total_ticks / tck / IDLE_WINDOW, 2),
+        "plasmashell_pss_mib": pss_of("plasmashell"),
+        "kwin_pss_mib": pss_of("kwin_wayland"),
+        "process_count": len(processes),
+        "versions": package_versions(),
+        # The largest processes; the rest are summed so the line stays short.
+        "processes": [[p["comm"], p["pss_mib"], p["cpu_pct"]] for p in listed],
+        "others": {"count": len(rest), "pss_mib": round(sum(p["pss_mib"] for p in rest), 1),
+                   "cpu_pct": round(sum(p["cpu_pct"] for p in rest), 2)},
+    }
+
+
+def stability(initial):
+    problems = []
+    now = {
+        "plasmashell": find_process("plasmashell"),
+        "kwin_wayland": find_process("kwin_wayland"),
+    }
+    for name, pid in initial["pids"].items():
+        if now[name] != pid:
+            problems.append(f"{name} pid {pid} -> {now[name]}")
+    shell_unit = unit_facts("plasma-plasmashell.service", user=True)
+    session_unit = unit_facts("staros-live-session.service")
+    if shell_unit.get("NRestarts", "0") != "0":
+        problems.append(f"plasma-plasmashell restarted {shell_unit.get('NRestarts')} times")
+    if session_unit.get("NRestarts", "0") != "0":
+        problems.append(f"staros-live-session restarted {session_unit.get('NRestarts')} times")
+    if session_unit.get("ActiveState") != "active":
+        problems.append(f"staros-live-session is {session_unit.get('ActiveState')}")
+    fields = (f"plasmashell_pid={now['plasmashell'] or 0} kwin_pid={now['kwin_wayland'] or 0} "
+              f"shell_restarts={shell_unit.get('NRestarts', '?')} "
+              f"session_restarts={session_unit.get('NRestarts', '?')}")
+    return problems, fields
+
+
+def main():
+    ok, facts, reason = wait_ready()
+    ready_at = time.monotonic()
+    emit(check_line(facts, uptime()))
+    line = shell_ready_line()
+    if line:
+        emit("STAROS-SESSION-SHELL-LOG " + line[line.find("STAROS-SHELL"):])
+    if not ok:
+        emit(f"STAROS-SESSION-FAIL reason={reason}")
+        return 1
+    emit("STAROS-SESSION-OK")
+    initial = {"pids": {"plasmashell": find_process("plasmashell"),
+                        "kwin_wayland": find_process("kwin_wayland")}}
+    render = renderer()
+
+    time.sleep(max(0, ready_at + IDLE_SETTLE - time.monotonic()))
+    emit("STAROS-IDLE-REPORT " + json.dumps(idle_report(render), separators=(",", ":")))
+    emit("STAROS-IDLE-DONE")
+
+    time.sleep(max(0, ready_at + STABLE_AFTER - time.monotonic()))
+    problems, fields = stability(initial)
+    if problems:
+        emit(f"STAROS-SESSION-UNSTABLE {fields} reason={'; '.join(problems)}")
+        return 1
+    emit(f"STAROS-SESSION-STABLE {fields}")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

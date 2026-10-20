@@ -1,0 +1,5 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Live medium (M0.2): locking is disabled for the passwordless live user
+# (kscreenlocker checks the 'lock_screen' action).
+[KDE Action Restrictions]
+action/lock_screen=false

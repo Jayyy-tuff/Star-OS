@@ -1,0 +1,39 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Star OS live medium only (M0.2, ADR-0008): logs the unprivileged live user into
+# the Star OS prototype session on tty1 without a display manager. Modelled on
+# KDE's plasma-mobile.service. The display manager is chosen in Phase 1; the
+# Phase 2 installer must not copy this unit or the display-manager.service link.
+[Unit]
+Description=Star OS live session on tty1 (prototype)
+Conflicts=getty@tty1.service
+After=getty@tty1.service systemd-user-sessions.service plymouth-quit-wait.service systemd-logind.service
+Wants=dbus.socket
+After=dbus.socket
+Before=graphical.target
+OnFailure=getty@tty1.service
+StartLimitIntervalSec=120
+StartLimitBurst=3
+ConditionPathExists=/dev/tty0
+
+[Service]
+User=liveuser
+PAMName=login
+WorkingDirectory=~
+# systemd passes these to PAM before pam_open_session; pam_systemd then records
+# a wayland session on seat0, VT 1 (XDG_VTNR must be a number).
+Environment=LANG=C.UTF-8 XDG_SESSION_TYPE=wayland XDG_SESSION_CLASS=user XDG_SESSION_DESKTOP=KDE XDG_SEAT=seat0 XDG_VTNR=1
+ExecStart=/usr/local/bin/startstaros
+Restart=always
+RestartSec=5s
+TTYPath=/dev/tty1
+TTYReset=yes
+TTYVHangup=yes
+TTYVTDisallocate=yes
+StandardInput=tty-fail
+StandardOutput=journal
+StandardError=journal
+UtmpIdentifier=tty1
+UtmpMode=user
+
+[Install]
+Alias=display-manager.service

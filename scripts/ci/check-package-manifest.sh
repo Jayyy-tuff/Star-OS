@@ -24,7 +24,12 @@ if [[ ! -f $expected ]]; then
 fi
 
 if ! diff -u -- "$expected" "$actual"; then
+    log "Full package list of this build (between the markers):"
+    echo "----- BEGIN packages.x86_64.txt -----"
+    cat -- "$actual"
+    echo "----- END packages.x86_64.txt -----"
     die "the ISO's packages differ from the recorded baseline (distro/baseline/packages.x86_64.txt)" \
-        "although the baseline date is $(staros_baseline_date)"
+        "at baseline date $(staros_baseline_date). If the change is intended (for example a" \
+        "reviewed change to packages.x86_64.append), commit the list above in the same change."
 fi
 log "Package list matches the recorded baseline ($(wc -l <"$actual") packages)"
