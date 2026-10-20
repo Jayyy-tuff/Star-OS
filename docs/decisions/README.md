@@ -26,6 +26,7 @@ release decisions require explicit human approval before they become
 | [0005](0005-installer-framework.md) | Installer framework | Accepted (Calamares) |
 | [0006](0006-boot-snapshots-secure-boot.md) | Bootloader, Btrfs snapshots, and Secure Boot | Deferred to Phase 2 |
 | [0007](0007-licensing.md) | Licensing of original components | Accepted (GPL-3.0-or-later) |
+| [0008](0008-m02-shell-hosting-and-live-session.md) | M0.2 shell hosting and live session | Accepted (option A2; implementation in progress) |
 
 ## Template
 

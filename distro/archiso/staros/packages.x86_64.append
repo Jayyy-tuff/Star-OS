@@ -1,0 +1,27 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Packages added to releng's list for milestone M0.2 (ADR-0008). One per line.
+# Session: KWin and Plasma's session services; plasmashell hosts the Star OS
+# shell packages. plasma-desktop provides the fallback shell package and kaccess.
+kwin
+plasma-workspace
+plasma-desktop
+kactivitymanagerd
+layer-shell-qt
+kitemmodels
+xorg-xwayland
+polkit-kde-agent
+libkscreen
+# Rendering: Mesa explicitly, so KWin's OpenGL path (llvmpipe without a GPU)
+# does not depend on dependency resolution.
+mesa
+noto-fonts
+# Applications in the curated M0.2 launcher catalogue.
+konsole
+systemsettings
+# Screen reader and audio.
+orca
+speech-dispatcher
+python-gobject
+pipewire
+pipewire-pulse
+wireplumber
