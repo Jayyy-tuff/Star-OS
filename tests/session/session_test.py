@@ -312,7 +312,8 @@ def run_scenarios(s):
     # S4: Meta opens the launcher with focus in the search field.
     s.keys("meta_l")
     focus = s.wait_focus("text", "Search applications")
-    if focus.get("name") != "Search applications":
+    if focus.get("name") not in ("Search applications", "Application launcher"):
+        # Only when the launcher did not open: Alt+F1 toggles it.
         s.record("S4", "INFO", f"Meta gave focus {focus}; retrying with Alt+F1")
         s.keys("alt", "f1")
         focus = s.wait_focus("text", "Search applications")

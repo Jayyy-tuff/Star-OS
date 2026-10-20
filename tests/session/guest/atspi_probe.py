@@ -91,8 +91,11 @@ def walk(name, seconds):
 
 
 def find_focused(obj, depth=0):
-    if obj.get_state_set().contains(Atspi.StateType.FOCUSED):
-        return obj
+    """Returns the deepest focused object below OBJ.
+
+    Qt also marks focus scopes (the launcher pane, the taskbar) as focused
+    while one of their children has focus, so the first match is not enough.
+    """
     if depth > 40:
         return None
     for i in range(obj.get_child_count()):
@@ -101,6 +104,8 @@ def find_focused(obj, depth=0):
             found = find_focused(child, depth + 1)
             if found is not None:
                 return found
+    if obj.get_state_set().contains(Atspi.StateType.FOCUSED):
+        return obj
     return None
 
 
