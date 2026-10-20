@@ -73,13 +73,18 @@ Item {
         }
 
         // Longest horizontal run of focus-ring pixels starting at an item's
-        // left edge, in device pixels.
+        // left edge, in device pixels. With the software scene graph,
+        // grabImage() returns device pixels without a pixel ratio, cropped to
+        // the item's logical size, so coordinates are scaled by the screen's
+        // ratio and must stay inside that crop.
         function ringRun(item) {
             waitForRendering(launcher);
             const img = grabImage(launcher);
-            const dpr = img.width / launcher.width;
+            const dpr = Screen.devicePixelRatio;
             const p = item.mapToItem(launcher, 0, item.height / 2);
             const y = Math.floor(p.y * dpr);
+            verify(Math.floor((p.x + 8) * dpr) < img.width && y < img.height,
+                   "sample point inside the grabbed image " + img.width + "x" + img.height);
             const ring = [Theme.focusRing.r * 255, Theme.focusRing.g * 255, Theme.focusRing.b * 255];
             let best = 0;
             let run = 0;

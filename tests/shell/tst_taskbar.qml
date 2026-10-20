@@ -20,6 +20,14 @@ Item {
         id: windows
     }
 
+    ListModel {
+        id: sparseWindows
+
+        ListElement {
+            display: "Only a title"
+        }
+    }
+
     // Stands in for the host panel: it sees the keys the taskbar leaves alone.
     FocusScope {
         id: host
@@ -73,6 +81,7 @@ Item {
         }
 
         function init() {
+            taskbar.tasksModel = windows;
             windows.clear();
             windows.append({display: "Konsole - ~", AppName: "Konsole", IsActive: true});
             windows.append({display: "", AppName: "System Settings", IsActive: false});
@@ -121,11 +130,14 @@ Item {
             compare(list.count, 3);
         }
 
+        // A model without the AppName and IsActive roles. The view applies
+        // model changes when it lays out, so delegates are awaited.
         function test_missing_roles_are_tolerated() {
-            windows.clear();
-            windows.append({display: "Only a title"});
-            compare(taskAt(0).Accessible.name, "Only a title");
+            taskbar.tasksModel = sparseWindows;
+            tryVerify(() => taskAt(0) !== null && taskAt(0).Accessible.name === "Only a title",
+                      5000, "the delegate shows the title");
             compare(taskAt(0).Accessible.description, "Window");
+            taskbar.tasksModel = windows;
         }
 
         function test_arrow_order() {
@@ -187,7 +199,7 @@ Item {
         function test_empty_list_is_never_focused() {
             windows.clear();
             compare(list.count, 0);
-            compare(list.Accessible.description, "No open windows");
+            tryCompare(list.Accessible, "description", "No open windows");
             keyClick(Qt.Key_Right);
             expectFocus(leave, "Leave");
             keyClick(Qt.Key_Left);
@@ -213,9 +225,11 @@ Item {
 
         function test_focus_ring_visible() {
             waitForRendering(host);
+            // Device pixels without a pixel ratio; see tst_launcher.qml.
             const img = grabImage(host);
-            const dpr = img.width / host.width;
+            const dpr = Screen.devicePixelRatio;
             const p = applications.mapToItem(host, 0, applications.height / 2);
+            verify(Math.floor((p.x + 8) * dpr) < img.width && Math.floor(p.y * dpr) < img.height);
             let best = 0;
             let run = 0;
             for (let x = Math.max(0, Math.floor(p.x * dpr) - 1); x < Math.floor((p.x + 8) * dpr); ++x) {

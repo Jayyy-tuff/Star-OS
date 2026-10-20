@@ -169,13 +169,14 @@ pacman_root() {
     pacman --root "$root" --dbpath "$root/var/lib/pacman" "$@"
 }
 
-# True if REL (relative to the root) is in the %BACKUP% list of package PKG.
+# True if REL (relative to the root) is in the %BACKUP% list of package PKG
+# (pacman keeps it in the local database entry's "files").
 is_backup_file() {
     local name version
-    read -r name version < <(pacman_root -Q "$1")
+    read -r name version < <(pacman_root -Q "$1" 2>/dev/null)
     awk -F '\t' -v want="$2" '/^%BACKUP%$/ { b = 1; next } /^%/ { b = 0 }
         b && $1 == want { found = 1 } END { exit !found }' \
-        "$root/var/lib/pacman/local/$name-$version/desc"
+        "$root/var/lib/pacman/local/$name-$version/files"
 }
 
 # Every overlay and shell file must be new (no package owns it), or a backup
