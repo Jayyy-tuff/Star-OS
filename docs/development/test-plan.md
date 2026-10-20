@@ -38,16 +38,72 @@ Status: draft, covering Phase 0 in detail and later phases in outline.
 | T0-10 | VMware UEFI boot | E-VMW | See manual procedure. Shell reached, marker present in journal |
 | T0-11 | VMware BIOS boot | E-VMW | Same with BIOS firmware (optional while BIOS support is undecided) |
 
-## Phase 0 tests (milestone M0.2, after ADR-0004 approval)
+## Phase 0 tests (milestone M0.2, ADR-0008)
 
-| ID | Test | Env | Pass condition |
-| --- | --- | --- | --- |
-| T0-20 | Live graphical session starts | E-CI, E-VMW | Compositor and shell running. A screenshot is captured in CI |
-| T0-21 | Taskbar and launcher work | E-VMW | Open, list, and switch two apps with the mouse |
-| T0-22 | Keyboard-only operation | E-VMW | T0-21 completed without a mouse. Focus always visible |
-| T0-23 | Scaling | E-VMW | Layout correct at 100/150/200%. Screenshots recorded |
-| T0-24 | Screen reader | E-VMW | Orca announces launcher entries |
-| T0-25 | Resource baseline | E-VMW, E-CI | Idle RAM/CPU after a defined settling period recorded (no pass/fail yet; this sets the first budget) |
+Each M0.2 test has evidence at up to three levels: unit tests of the
+`StarOS.Shell` QML module (offscreen, no Plasma), the real CI-built ISO in
+QEMU/KVM, and the owner's VMware run. A QEMU result is never reported as a
+VMware or hardware result. The "CI now" column says what is automated today;
+the rest is planned (design spec, iterations 4–8) or owner-run.
+
+| ID | Test | Env | Pass condition | CI now |
+| --- | --- | --- | --- | --- |
+| T0-20 | Live graphical session starts | E-CI, E-VMW | On the booted ISO (UEFI and BIOS), `staros-session-report` prints `STAROS-SESSION-CHECK` with `logind_type=wayland`, `seat=seat0`, `shell=org.staros.shell`, the layout (one bottom, non-floating `org.staros.taskbar` panel; `org.staros.desktop` with the `org.kde.color` wallpaper), `grant=ok`, no `plasmashellrc` override, `PLASMA_DEFAULT_SHELL` set in plasmashell, and no variable from `scripts/ci/forbidden-env.txt` in KWin or plasmashell; then `STAROS-SESSION-OK`. A PNG screen dump is uploaded. The QML unit tests pass at 100, 150 and 200 % | Session report and checks: **yes** (`boot-test`). Screen band line: informational. Unit tests: **yes** (`shell-checks`) |
+| T0-20b | Session stays up | E-CI, E-VMW | `STAROS-SESSION-STABLE` 330 s after ready: same plasmashell and KWin processes, no restarts of `plasma-plasmashell` or `staros-live-session` | **yes** (`idle`, three runs) |
+| T0-21 | Taskbar and launcher work | E-CI, E-VMW | Unit: one task button per window, activation signals, search, launch, empty states. Session: launch two apps from the launcher, see both in the taskbar, switch between them (KWin's active window agrees). Owner: the same with the mouse | Unit: **yes**. Session: planned (QMP/guest-agent harness) |
+| T0-22 | Keyboard-only operation | E-CI, E-VMW | Unit: Tab and arrow order, Return/Space/Escape, search ↔ grid, the empty window list never focused, focus-ring pixels at each scale. Session: the T0-21 path with keys only (Meta or Alt+F1, typing, arrows, Return, Escape, Meta+Alt+P). Owner: no mouse; the amber ring always visible | Unit: **yes**. Session: planned |
+| T0-23 | Scaling | E-CI, E-VMW | Unit, at scale factors 1, 1.5 and 2 on a 1920×1080 offscreen screen: tiles inside the launcher and non-overlapping, minimum target size, names up to 20 characters not truncated, the taskbar fits Applications, three task buttons and Leave at 960 px. Session: `kscreen-doctor` 1.5/2/1 with AT-SPI geometry. Owner: screenshots at 100/150/200 % | Unit: **yes**. Session: planned |
+| T0-24 | Screen reader | E-CI, E-VMW | Session: AT-SPI roles and names of the taskbar and launcher; Meta+Alt+S starts Orca; Orca's debug log shows each focused tile name. Owner: audible speech through both start paths | Planned (informational until three green runs) |
+| T0-25 | Resource baseline | E-CI, E-VMW | No pass/fail yet. `STAROS-IDLE-REPORT` 240 s after ready, 60 s window: PSS of every live-user process (smaps_rollup), session CPU % of one CPU, memory in use, renderer and package versions. CI reports median, min and max of three boots, labelled "not a performance claim" | **yes** (`idle`, `idle-summary`) |
+| T0-26 | Image policy | E-CI | `check-image-policy.sh` on the built root file system: no forbidden variable names; root locked; `liveuser` 1000:1000 with `/bin/bash`, not in wheel; sudoers file 0440 and valid; sshd masked; no getty autologin; `display-manager.service` is the live session unit; `default.target` is graphical; `staros.desktop` valid; shell files installed with no private Plasma import; overlay files unowned or package backup files | **yes** (`build`; the build fails on a violation) |
+
+How the CI evidence is produced:
+
+- `staros-session-report` (live image, root, read-only) prints its lines to
+  the journal and the first serial port; `tests/iso/boot_test.py --session`
+  reads them from QEMU's serial log. The same lines are available in VMware
+  with `sudo journalctl -b -u staros-session-report -o cat`.
+- `tests/shell/run-qml-tests.sh` runs `qmllint` (fatal for `StarOS.Shell`),
+  installs the three Plasma packages with `kpackagetool6` into a scratch home,
+  and runs `qmltestrunner` at `QT_SCALE_FACTOR` 1, 1.5 and 2. Each run must
+  report the scale it asked for.
+- The screen dump analysis (`tests/iso/screen.py`) counts the rows of
+  taskbar colour at the bottom of the screen and the share of desktop colour
+  above it. It is informational until it has been green in three consecutive
+  runs; AT-SPI geometry will be the authority once the session harness exists.
+
+## Manual procedure: VMware Workstation, M0.2 (T0-20..T0-25)
+
+Use the ISO of a green CI run and record that run's link in the log.
+
+1. Verify the checksum as in the M0.1 procedure. Create a VM with 4 vCPU and
+   4 GB RAM, UEFI without Secure Boot, no virtual disk. Run each step once with
+   **Accelerate 3D graphics** on and once with it off.
+2. Boot the default entry. Expected: no login prompt; the Star OS taskbar at
+   the bottom (Applications, Leave) on a blue-grey desktop.
+3. T0-21 (mouse): Applications → Konsole; Applications → System Settings. Both
+   appear in the taskbar. Switch by clicking; click the active button to
+   minimise and again to restore.
+4. T0-22 (keyboard only): Meta (or Alt+F1) opens the launcher with focus in
+   the search field; type, use the arrows, Return to launch, Escape to close.
+   Meta+Alt+P focuses the taskbar; Left/Right and Return switch windows.
+   Ctrl+Alt+Del opens the logout prompt. Note any step where the amber focus
+   ring is not visible or focus is lost.
+5. T0-23: in Konsole, run `kscreen-doctor -o`, then
+   `kscreen-doctor output.<name>.scale.1.5` (and `.2`, then `.1`). Screenshot
+   the taskbar and the open launcher at each scale. Note clipping, blur or
+   overlap.
+6. T0-24: run `spd-say test` (must be audible), then Meta+Alt+S. Open the
+   launcher and arrow through the entries and the taskbar; record what is
+   spoken. Repeat once from the "speech" boot entry.
+7. T0-25: three cold boots. Do not touch the VM for 6 minutes after the
+   taskbar appears, then open Konsole and run
+   `sudo journalctl -b -u staros-session-report -o cat`. Paste the
+   `STAROS-SESSION-CHECK`, `STAROS-IDLE-REPORT` and `STAROS-SESSION-STABLE`
+   lines into an issue and summarise them in the log below.
+8. Stays up: leave the session running for 30 minutes and note anything that
+   restarts or degrades. Log out from Leave and check that the session comes
+   back after about 5 seconds.
 
 ## Later phases (outline, from specification Part VII)
 

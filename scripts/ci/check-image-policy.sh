@@ -140,7 +140,8 @@ default_target_graphical() {
 }
 
 session_entry_valid() {
-    desktop-file-validate "$root/usr/share/wayland-sessions/staros.desktop"
+    "$staros_repo_root/scripts/ci/validate-session-entry.sh" \
+        "$root/usr/share/wayland-sessions/staros.desktop"
 }
 
 shell_files_present() {
@@ -223,7 +224,7 @@ check "sshd is masked and not enabled" sshd_masked
 check "no getty autologin" no_getty_autologin
 check "display-manager.service is the Star OS live session unit" live_session_unit
 check "default.target is graphical.target" default_target_graphical
-check "staros.desktop passes desktop-file-validate" session_entry_valid
+check "staros.desktop passes desktop-file-validate (DesktopNames allowed)" session_entry_valid
 check "Star OS shell files are installed" shell_files_present
 check "no org.kde.plasma.private import in Star OS shell files" no_private_plasma_imports
 check "overlay and shell paths are unowned or package backup files" overlay_paths_unowned

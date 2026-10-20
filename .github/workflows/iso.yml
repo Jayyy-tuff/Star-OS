@@ -60,7 +60,8 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends desktop-file-utils
-          desktop-file-validate distro/archiso/staros/airootfs/usr/share/wayland-sessions/staros.desktop
+          scripts/ci/validate-session-entry.sh \
+            distro/archiso/staros/airootfs/usr/share/wayland-sessions/staros.desktop
       - name: Record source date epoch
         id: epoch
         run: echo "value=$(git log -1 --format=%ct)" >> "$GITHUB_OUTPUT"
@@ -267,7 +268,8 @@ jobs:
   idle-summary:
     name: Idle summary (T0-25, no threshold)
     needs: idle
-    if: always()
+    # Also after a failed idle run, but not when the runs were skipped.
+    if: ${{ !cancelled() && needs.idle.result != 'skipped' }}
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0

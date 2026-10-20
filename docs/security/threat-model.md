@@ -53,14 +53,47 @@ every new privileged component.
 
 ## Accepted risks in Phase 0
 
-- **The live ISO automatically logs in as root on the console** (archiso
-  `releng` behaviour). Acceptable for live media meant for testing. It must
-  never carry over to an installed system. Phase 1 will move the live graphical
-  session to an unprivileged live user.
+- **Live medium: passwordless `liveuser` with autologin and `NOPASSWD` sudo**
+  (M0.2, ADR-0008). `staros-live-session.service` logs `liveuser` (UID 1000,
+  no supplementary groups, not in `wheel`) into the graphical session on tty1;
+  `/etc/sudoers.d/10-staros-live` lets it run any command as root without a
+  password. Root is locked, releng's root console autologin is removed, and
+  sshd is masked with no wants link. Screen locking is disabled for this user
+  (kiosk `action/lock_screen=false`), so an empty password can never lock the
+  owner out. Anyone with access to a running live session has root; that is
+  acceptable for a test medium that holds no user data. `check-image-policy.sh`
+  verifies this posture on every build (test T0-26).
+- **Installer requirement (Phase 2).** The installer must never copy these
+  live-only files to an installed system: `/etc/sudoers.d/10-staros-live`,
+  `staros-live-session.service` and the `display-manager.service` link, the
+  sshd mask, the overlay's `/etc/passwd`, `shadow`, `group` and `gshadow`,
+  `/home/liveuser`, and the diagnostics units (`staros-boot-check`,
+  `staros-session-report`).
+- **Prototype diagnostics run as root.** `staros-session-report` runs as root
+  for about 10 minutes after the session starts. It only reads (`/proc`,
+  `loginctl`, `systemctl`, the journal, read-only queries on the live user's
+  session bus, plus a Plasma script that prints the layout) and writes to the
+  journal and the serial port. Phase 1 removes it or makes it opt-in.
+- **QEMU guest agent.** releng installs `qemu-guest-agent`, and Arch's package
+  starts it through a udev rule when the hypervisor offers its virtio port
+  (checked at the 2026-10-15 snapshot). A hypervisor that offers the port can
+  run commands as root in the guest; this is the same class of access as
+  releng's already-enabled VMware tools, and the hypervisor controls the VM
+  anyway. The owner approved using this channel for CI tests (ADR-0008).
+- **No CI-only bypasses.** The image, the shell sources and the CI steps that
+  run the shell never set KWin's Wayland permission-check bypasses, forced Qt
+  accessibility, or a forced compositing backend
+  (`scripts/ci/forbidden-env.txt`). The taskbar gets the window list only
+  through plasmashell's packaged grant. Checked in the repository, in the
+  built image, and in the running session's KWin and plasmashell environment.
 - **No Secure Boot.** Users must disable Secure Boot to boot prototypes
   (ADR-0006).
 - **Prototype ISOs are unsigned.** CI artifacts are for testing only and must
   not be called official builds.
+
+Upstream observation for later phases: KWin 6.7.5's EIS remote-desktop D-Bus
+method does not check its caller (threat #3 class); revisit before Star OS
+ships its own privileged session services.
 
 ## Open questions
 
