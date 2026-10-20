@@ -115,12 +115,46 @@ Known follow-ups (not blocking):
 Graphical session, installer, accounts, Secure Boot, ISO signing, a Star OS
 package repository, branding artwork, and hardware support claims.
 
-## Next: M0.2 — shell prototype on the live ISO
+## M0.2 — shell prototype on the live ISO (in progress)
 
-After ADR-0004 is approved: add KWin, the Star OS shell prototype, and a live
-graphical session to the M0.1 ISO. Then run the six prototype checks listed in
-ADR-0004 in QEMU and VMware. M0.2 closes Phase 0 together with recorded
-architecture approval.
+ADR-0008 (accepted 2026-10-20) fixes the approach: an unmodified plasmashell
+loads the Star OS shell package, whose visible UI is the Plasma-free
+`StarOS.Shell` QML module; the live medium logs an unprivileged `liveuser`
+into a Wayland session on KWin. The engineering spec is
+`docs/architecture/m02-shell-prototype-design.md`; the tests are T0-20..T0-26
+in `test-plan.md`.
+
+### Status (2026-10-20, CI run 9 on commit 64fb1ab)
+
+Measured in CI (QEMU/KVM on GitHub's Ubuntu runners; not VMware or hardware
+results):
+
+- **Build and image policy:** the ISO builds (2,170,028,032 bytes, 847
+  packages: the 392 additions iteration 0 predicted, no other change) and
+  every image policy check passes (T0-26).
+- **Session starts (T0-20), UEFI and BIOS:** `staros-session-report` reports a
+  `wayland` logind session for `liveuser` on seat0/VT 1, plasmashell running
+  `org.staros.shell` with the expected layout (one bottom, non-floating
+  `org.staros.taskbar` panel, 45 px; `org.staros.desktop` with the colour
+  wallpaper), renderer llvmpipe, the window-management grant present, and no
+  forbidden variable in KWin's or plasmashell's environment. The session was
+  ready about 33 s after boot. The screen dump shows 45 rows of taskbar colour
+  and desktop colour everywhere else (informational check).
+- **Stays up and idle cost (T0-20b, T0-25):** three UEFI boots, each stable 330
+  s after ready (same plasmashell and KWin processes, no restarts). Median
+  (min–max) after 240 s idle, 60 s window: session PSS 714.8 MiB (713.7–719.7)
+  over 30 processes, plasmashell 344 MiB, kwin_wayland 188.9 MiB, system memory
+  in use 1003 MiB of 3.9 GiB, session CPU 0.05 % of one CPU (0.03–0.08). These
+  describe a CI VM with software rendering and are not performance claims.
+- **QML unit tests (T0-20..T0-23 unit level):** 182 of 183 test functions pass
+  across 100/150/200 %; the remaining failure was a test-side grab-crop issue
+  at 200 %, fixed in the following commit.
+- **Session harness (T0-21/T0-22 in QEMU):** the guest agent channel works;
+  the keyboard scenarios (launch, list, switch, Escape) are being brought up.
+
+Still to do: the session harness scenarios, Orca (T0-24) and scaling under
+KWin (T0-23) in CI, then the owner's VMware run (procedure in `test-plan.md`)
+and the ADR-0004 A/B decision with these numbers.
 
 ## Supported hardware assumptions (Phase 0)
 

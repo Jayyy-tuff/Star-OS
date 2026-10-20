@@ -260,11 +260,13 @@ def run_scenarios(s):
     # S1: session facts seen from inside the guest.
     code, out, _ = s.guest(["/usr/bin/sh", "-c",
                             "pid=$(pgrep -u liveuser -x plasmashell | head -n1); "
-                            "tr '\\0' '\\n' </proc/$pid/environ | grep -E '^(PLASMA_DEFAULT_SHELL|WAYLAND_DISPLAY|XDG_SESSION_TYPE)='; "
-                            "ls /home/liveuser/.config/plasma-org.staros.shell-appletsrc"])
+                            "tr '\\0' '\\n' </proc/$pid/environ | grep -E '^(PLASMA_DEFAULT_SHELL|WAYLAND_DISPLAY|XDG_SESSION_TYPE)='"])
     s.check("S1", "PLASMA_DEFAULT_SHELL=org.staros.shell" in out
-            and "plasma-org.staros.shell-appletsrc" in out,
-            "plasmashell environment and appletsrc: " + out.replace("\n", " ").strip())
+            and "XDG_SESSION_TYPE=wayland" in out,
+            "plasmashell environment: " + out.replace("\n", " ").strip())
+    # plasmashell saves its layout lazily, so the file may appear later.
+    code, out, _ = s.guest(["/usr/bin/sh", "-c", "ls /home/liveuser/.config/ | grep appletsrc"])
+    s.record("S1", "INFO", "appletsrc files: " + (out.replace("\n", " ").strip() or "none yet"))
 
     # S2: helpers, KWin oracle and its listener.
     for name in HELPERS:

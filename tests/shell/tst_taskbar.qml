@@ -225,10 +225,12 @@ Item {
 
         function test_focus_ring_visible() {
             waitForRendering(host);
-            // Device pixels without a pixel ratio; see tst_launcher.qml.
-            const img = grabImage(host);
+            // Device pixels without a pixel ratio, cropped to the grabbed
+            // item's logical size (see tst_launcher.qml), so the taller root
+            // item is grabbed to keep the taskbar inside the crop at 200 %.
+            const img = grabImage(root);
             const dpr = Screen.devicePixelRatio;
-            const p = applications.mapToItem(host, 0, applications.height / 2);
+            const p = applications.mapToItem(root, 0, applications.height / 2);
             verify(Math.floor((p.x + 8) * dpr) < img.width && Math.floor(p.y * dpr) < img.height);
             let best = 0;
             let run = 0;
