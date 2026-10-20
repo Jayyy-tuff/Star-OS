@@ -836,6 +836,34 @@ DOCUMENTATION
 - Star-OS CI probe log (inspect-kde run 2, scripts at bc4fb29): installing kwin, plasma-workspace, plasma-desktop and the probe list into the pinned container pulled in kactivitymanagerd, kglobalacceld, powerdevil, polkit-kde-agent, xdg-desktop-portal-kde, baloo, libkscreen, systemsettings, kmenuedit, kscreenlocker, python-gobject, gsettings-desktop-schemas, pipewire and wireplumber, but not pipewire-pulse; the earlier KWin smoke shows exit 124 with an empty kwin.log and a created but empty spectacle.log (session script ran; spectacle likely hung)
 - Star-OS working tree (read-only): build-iso.sh copies the overlay after releng with cp -a; boot_test.py build_qemu_command uses -vga std, 2048 MiB, -smp 2; M0.1 overlay files motd and staros-release carry no SPDX line (precedent for passwd/shadow/group/gshadow); the baseline already has gsettings-desktop-schemas, at-spi2-core, python, sudo, qemu-guest-agent 11.1.2 and open-vm-tools
 
+## Settled by CI (2026-10-20)
+
+Facts from the iteration-0 probe and CI run 9 (commit 64fb1ab). They replace
+the corresponding open unknowns below.
+
+- Arch's `qemu-guest-agent` 11.1.2 at the snapshot ships
+  `/usr/lib/udev/rules.d/99-qemu-guest-agent.rules`; the session test reached
+  the agent through a virtio port with no image change.
+- The planned package list resolves to 847 packages (392 new, about 1.9 GB
+  installed); the ISO is 2,170,028,032 bytes and builds in about 20 minutes
+  with 76 GB left on the runner.
+- `org.kde.kmenuedit.desktop`, `org.kde.konsole.desktop` and
+  `systemsettings.desktop` are installed and visible; `kwriteconfig6`
+  (kconfig), `kscreen-doctor` (libkscreen) and `gsettings` are present.
+- QEMU 8.2.2 on ubuntu-24.04 accepts `-device VGA,xres=1920,yres=1080`, and
+  KWin uses 1920x1080 on bochs-drm.
+- The display-manager-less unit gives a `wayland` logind session on seat0,
+  VT 1, class `user`; plasmashell loads `org.staros.shell` from
+  `PLASMA_DEFAULT_SHELL`, runs `layout.js` and creates the pure-QML Panel and
+  Desktop containments; the panel is 45 px (gridUnit 18) and does not float.
+- KWin renders with llvmpipe (LLVM 23.1.1) in QEMU; the reserved colours come
+  through exactly enough for the band check (45 rows of taskbar colour).
+- plasmashell's `console.info` lines reach the journal (`STAROS-SHELL ready
+  ... gridUnit=18 taskbarHeight=45`, `catalogue=3`, `tasks=0`).
+- With the software scene graph, Qt Quick Test's `grabImage()` returns device
+  pixels with no pixel ratio, cropped to the item's logical size; ListView
+  applies model changes at polish time. The unit tests account for both.
+
 ## Open unknowns
 
 - Whether the 2026-10-15 Arch qemu-guest-agent package still ships the udev auto-start rule (iteration 0)

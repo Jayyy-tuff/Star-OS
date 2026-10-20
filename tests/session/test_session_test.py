@@ -13,7 +13,7 @@ TREE = {
     "role": "application", "name": "plasmashell", "children": [
         {"role": "frame", "name": "", "children": [
             {"role": "tool bar", "name": "Taskbar", "description": "", "children": [
-                {"role": "push button", "name": "Applications", "description": "x", "children": []},
+                {"role": "button", "name": "Applications", "description": "x", "children": []},
                 {"role": "list", "name": "Open windows", "description": "", "children": [
                     {"role": "push button", "name": "Konsole", "description": "Window",
                      "children": []},
@@ -30,9 +30,10 @@ TREE = {
 class HelperTest(unittest.TestCase):
     def test_find_by_role_and_name(self):
         self.assertEqual(len(session_test.find(TREE, role="tool bar", name="Taskbar")), 1)
-        self.assertEqual(len(session_test.find(TREE, role="push button")), 4)
+        self.assertEqual(len(session_test.find(TREE, role=session_test.BUTTON)), 4)
+        self.assertEqual(len(session_test.find(TREE, role="push button")), 3)
         windows = session_test.find(TREE, role="list", name="Open windows")[0]
-        self.assertEqual([b["name"] for b in session_test.find(windows, role="push button")],
+        self.assertEqual([b["name"] for b in session_test.find(windows, role=session_test.BUTTON)],
                          ["Konsole", "System Settings"])
         self.assertEqual(session_test.find(TREE, description="Active window")[0]["name"],
                          "System Settings")
@@ -42,6 +43,25 @@ class HelperTest(unittest.TestCase):
         self.assertTrue(session_test.is_active({"active": "org.kde.konsole"}, "konsole"))
         self.assertFalse(session_test.is_active({"active": None}, "konsole"))
         self.assertFalse(session_test.is_active({}, "systemsettings"))
+
+    def test_launcher_geometry(self):
+        def tree(*tiles, window=(0, 0, 1920, 1080)):
+            return {"role": "application", "children": [
+                {"role": "frame", "name": "Star OS applications", "extents": list(window),
+                 "children": [{"role": "push button", "name": n, "extents": list(e),
+                               "children": []} for n, e in tiles]}]}
+        ok, _ = session_test.launcher_geometry(tree(("A", (36, 117, 162, 126)),
+                                                    ("B", (207, 117, 162, 126))))
+        self.assertTrue(ok)
+        ok, detail = session_test.launcher_geometry(tree(("A", (36, 117, 162, 126)),
+                                                         ("B", (100, 117, 162, 126))))
+        self.assertFalse(ok)
+        self.assertIn("overlaps", detail)
+        ok, detail = session_test.launcher_geometry(tree(("A", (1900, 0, 162, 126)),
+                                                         ("B", (0, 0, 10, 10))))
+        self.assertFalse(ok)
+        self.assertIn("outside", detail)
+        self.assertFalse(session_test.launcher_geometry({"role": "application"})[0])
 
     def test_qcode(self):
         self.assertEqual([session_test.qcode(c) for c in "Kon 1"], ["k", "o", "n", "spc", "1"])

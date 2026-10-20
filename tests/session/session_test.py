@@ -19,6 +19,9 @@ Scenarios:
   S2 test helpers and KWin oracle   S7 both windows in the taskbar
   S3 taskbar over AT-SPI            S8 switch windows with Meta+Alt+P
   S4 Meta opens the launcher        S9 Escape closes the launcher
+  Informational: S11 scaling with kscreen-doctor (AT-SPI geometry and screen
+  dumps at 150, 200 and 100 %), S10 Orca (Meta+Alt+S, then a debug Orca's
+  speech output for the launcher).
 
 Prints one 'EVIDENCE <scenario> PASS|FAIL|INFO <detail>' line per check and
 writes session-result.json. Helpers are copied to /run/staros-test (tmpfs)
@@ -215,7 +218,8 @@ class Session:
         focus = None
         while time.monotonic() < deadline:
             focus = self.atspi("focused", "2", timeout=30)
-            if focus.get("role") == role and (name is None or focus.get("name") == name):
+            roles = (role,) if isinstance(role, str) else role
+            if focus.get("role") in roles and (name is None or focus.get("name") == name):
                 return focus
             time.sleep(0.5)
         return focus
@@ -230,10 +234,15 @@ def is_active(report, app):
     return app in str(report.get("active") or "").lower()
 
 
+# at-spi2-core renamed the push-button role name to "button"; accept both.
+BUTTON = ("push button", "button")
+
+
 def find(node, role=None, name=None, description=None):
-    """All nodes of an AT-SPI tree matching the given fields."""
+    """All nodes of an AT-SPI tree matching the given fields (role: str or tuple)."""
+    roles = (role,) if isinstance(role, str) else role
     found = []
-    if ((role is None or node.get("role") == role)
+    if ((roles is None or node.get("role") in roles)
             and (name is None or node.get("name") == name)
             and (description is None or node.get("description") == description)):
         found.append(node)
@@ -294,9 +303,10 @@ def run_scenarios(s):
         json.dump(tree, f, indent=1)
     toolbar = find(tree, role="tool bar", name="Taskbar")
     s.check("S3", bool(toolbar), "plasmashell exposes a 'Taskbar' tool bar")
-    for role, name in (("push button", "Applications"), ("list", "Open windows"),
-                       ("push button", "Leave")):
-        s.check("S3", bool(find(toolbar[0], role=role, name=name)), f"{role} '{name}' in the taskbar")
+    outline = [(n.get("role"), n.get("name")) for n in find(toolbar[0])]
+    for role, name in ((BUTTON, "Applications"), ("list", "Open windows"), (BUTTON, "Leave")):
+        s.check("S3", bool(find(toolbar[0], role=role, name=name)),
+                f"{name!r} in the taskbar; taskbar objects: {outline}")
     s.screenshot("S3-desktop")
 
     # S4: Meta opens the launcher with focus in the search field.
@@ -330,7 +340,7 @@ def run_scenarios(s):
     with open(os.path.join(s.log_dir, "atspi-two-windows.json"), "w") as f:
         json.dump(tree, f, indent=1)
     windows = find(tree, role="list", name="Open windows")
-    buttons = find(windows[0], role="push button") if windows else []
+    buttons = find(windows[0], role=BUTTON) if windows else []
     s.check("S7", len(buttons) == 2,
             "taskbar buttons: " + json.dumps([(b["name"], b["description"]) for b in buttons]))
     active = [b for b in buttons if b["description"] == "Active window"]
@@ -339,11 +349,11 @@ def run_scenarios(s):
 
     # S8: keyboard switching through the taskbar.
     s.keys("meta_l", "alt", "p")
-    focus = s.wait_focus("push button", "Applications")
+    focus = s.wait_focus(BUTTON, "Applications")
     s.check("S8", focus.get("name") == "Applications",
             f"Meta+Alt+P focuses the taskbar: {json.dumps(focus)}")
     s.keys("right")
-    focus = s.wait_focus("push button", None)
+    focus = s.wait_focus(BUTTON, None)
     s.record("S8", "INFO", f"Right focuses {json.dumps(focus)}")
     s.keys("ret")
     report = s.wait_oracle(lambda e: is_active(e, KONSOLE), 20, f"active {KONSOLE}")
@@ -355,6 +365,81 @@ def run_scenarios(s):
     s.keys("esc")
     report = s.wait_oracle(lambda e: is_active(e, KONSOLE), 20, f"active {KONSOLE}")
     s.check("S9", True, f"Escape returns to Konsole: {json.dumps(report)}")
+
+    # Informational until each has three consecutive green runs (design spec).
+    for scenario in (scenario_scaling, scenario_orca):
+        try:
+            scenario(s)
+        except (CheckFailed, qga.GuestAgentError, boot_test.SetupError, ValueError,
+                KeyError, IndexError) as err:
+            s.record(scenario.__name__, "INFO", f"did not complete: {err}")
+
+
+def overlaps(a, b):
+    return a[0] < b[0] + b[2] and b[0] < a[0] + a[2] and a[1] < b[1] + b[3] and b[1] < a[1] + a[3]
+
+
+def launcher_geometry(tree):
+    """Checks tiles of the open launcher: inside its window, no overlaps."""
+    frames = find(tree, role="frame", name="Star OS applications")
+    if not frames:
+        return False, "launcher window not found over AT-SPI"
+    window = frames[0]["extents"]
+    tiles = [t for t in find(frames[0], role=BUTTON) if t.get("extents")]
+    problems = []
+    for i, tile in enumerate(tiles):
+        x, y, w, h = tile["extents"]
+        if x < 0 or y < 0 or x + w > window[2] or y + h > window[3]:
+            problems.append(f"{tile['name']} {tile['extents']} outside {window}")
+        for other in tiles[i + 1:]:
+            if overlaps(tile["extents"], other["extents"]):
+                problems.append(f"{tile['name']} overlaps {other['name']}")
+    return (len(tiles) >= 2 and not problems,
+            f"{len(tiles)} tiles in window {window}; " + ("; ".join(problems) or "no problems"))
+
+
+# S11: real scaling under KWin with kscreen-doctor (as the live user).
+def scenario_scaling(s):
+    code, out, err = s.as_user(["/usr/bin/kscreen-doctor", "-j"], timeout=30)
+    outputs = json.loads(out[out.find("{"):])["outputs"]
+    name = outputs[0]["name"]
+    for scale in ("1.5", "2", "1"):
+        s.as_user(["/usr/bin/kscreen-doctor", f"output.{name}.scale.{scale}"], timeout=30)
+        time.sleep(4)
+        s.screenshot(f"S11-desktop-scale-{scale}")
+        s.keys("meta_l")
+        s.wait_focus("text", "Search applications")
+        ok, detail = launcher_geometry(s.atspi("walk", "plasmashell", "20"))
+        s.record("S11", "INFO", f"scale {scale}: {'PASS' if ok else 'FAIL'} {detail}")
+        s.screenshot(f"S11-launcher-scale-{scale}")
+        s.keys("esc")
+        time.sleep(1)
+
+
+# S10: Orca. Meta+Alt+S is kaccess's toggle; a debug Orca then logs what it
+# would speak, even without a speech server.
+def scenario_orca(s):
+    s.keys("meta_l", "alt", "s")
+    started = False
+    deadline = time.monotonic() + 30
+    while time.monotonic() < deadline and not started:
+        code, out, _ = s.guest(["/usr/bin/pgrep", "-u", "liveuser", "-x", "orca"])
+        started = code == 0
+        time.sleep(1)
+    s.record("S10", "INFO", f"Meta+Alt+S started Orca: {started}")
+    s.guest(["/usr/bin/pkill", "-u", "liveuser", "-x", "orca"])
+    log = "/run/user/1000/staros-orca-debug.out"
+    s.as_user(["/usr/bin/orca", "--replace", "--debug", f"--debug-file={log}"], wait=False)
+    time.sleep(10)
+    for keys in (("meta_l",), ("down",), ("right",), ("esc",)):
+        s.keys(*keys)
+        time.sleep(2)
+    code, out, _ = s.guest(["/usr/bin/grep", "-a", "SPEECH OUTPUT", log])
+    spoken = [line.split("SPEECH OUTPUT:", 1)[-1].strip() for line in out.splitlines()]
+    heard = [n for n in ("Search applications", "KMenuEdit", "Konsole") if any(n in x for x in spoken)]
+    s.record("S10", "INFO", f"names in Orca's speech output: {heard}; last lines: "
+             + " | ".join(spoken[-12:]))
+    s.guest(["/usr/bin/pkill", "-u", "liveuser", "-x", "orca"])
 
 
 def main(argv=None):
