@@ -149,12 +149,34 @@ results):
 - **QML unit tests (T0-20..T0-23 unit level):** 182 of 183 test functions pass
   across 100/150/200 %; the remaining failure was a test-side grab-crop issue
   at 200 %, fixed in the following commit.
-- **Session harness (T0-21/T0-22 in QEMU):** the guest agent channel works;
-  the keyboard scenarios (launch, list, switch, Escape) are being brought up.
 
-Still to do: the session harness scenarios, Orca (T0-24) and scaling under
-KWin (T0-23) in CI, then the owner's VMware run (procedure in `test-plan.md`)
-and the ADR-0004 A/B decision with these numbers.
+### Status (2026-10-21, CI run 12 on commit 531912f: every job green)
+
+- **Unit tests:** all 183 QML test functions pass at 100, 150 and 200 %.
+- **Keyboard-only use on the real ISO (T0-21, T0-22 in QEMU):** with key
+  presses sent through QMP, Meta opens the launcher with focus in "Search
+  applications"; typing `kon` and Return launches Konsole, `sys` and Return
+  launches System Settings, and KWin's own view reports each as the active
+  window; the taskbar lists both windows with exactly one described as
+  "Active window"; Meta+Alt+P focuses "Applications", Right and Return
+  activate Konsole; Escape closes the launcher and KWin returns focus to
+  Konsole. AT-SPI shows the taskbar as a tool bar with Applications, the
+  Open windows list and Leave.
+- **Scaling under KWin (T0-23, informational):** with `kscreen-doctor` at 150,
+  200 and 100 %, the launcher's tiles stay inside its window and do not
+  overlap; the taskbar band measures 67, 90 and 45 rows.
+- **Screen reader (T0-24, informational):** Meta+Alt+S starts Orca; a debug
+  Orca logs what it would speak while the launcher is used: "Star OS
+  applications", "Application launcher panel", "Search applications text",
+  "Applications list", "Konsole button", "Terminal", "Menu Editor button".
+  Audible speech is an owner check.
+- **Idle (T0-25):** a second set of three boots gives a session PSS median of
+  713.6 MiB (660.4–716.3), plasmashell 343.6 MiB, kwin_wayland 190.6 MiB,
+  1004 MiB in use, session CPU 0.05 % of one CPU; all stable.
+
+Still to do: keep S10 and S11 informational until they have three consecutive
+green runs; the owner's VMware run (procedure in `test-plan.md`, 3D on and
+off); then the ADR-0004 A/B decision with the CI and VMware numbers.
 
 ## Supported hardware assumptions (Phase 0)
 

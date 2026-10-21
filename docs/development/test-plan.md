@@ -50,10 +50,10 @@ the rest is planned (design spec, iterations 4–8) or owner-run.
 | --- | --- | --- | --- | --- |
 | T0-20 | Live graphical session starts | E-CI, E-VMW | On the booted ISO (UEFI and BIOS), `staros-session-report` prints `STAROS-SESSION-CHECK` with `logind_type=wayland`, `seat=seat0`, `shell=org.staros.shell`, the layout (one bottom, non-floating `org.staros.taskbar` panel; `org.staros.desktop` with the `org.kde.color` wallpaper), `grant=ok`, no `plasmashellrc` override, `PLASMA_DEFAULT_SHELL` set in plasmashell, and no variable from `scripts/ci/forbidden-env.txt` in KWin or plasmashell; then `STAROS-SESSION-OK`. A PNG screen dump is uploaded. The QML unit tests pass at 100, 150 and 200 % | Session report and checks: **yes** (`boot-test`). Screen band line: informational. Unit tests: **yes** (`shell-checks`) |
 | T0-20b | Session stays up | E-CI, E-VMW | `STAROS-SESSION-STABLE` 330 s after ready: same plasmashell and KWin processes, no restarts of `plasma-plasmashell` or `staros-live-session` | **yes** (`idle`, three runs) |
-| T0-21 | Taskbar and launcher work | E-CI, E-VMW | Unit: one task button per window, activation signals, search, launch, empty states. Session: launch two apps from the launcher, see both in the taskbar, switch between them (KWin's active window agrees). Owner: the same with the mouse | Unit: **yes**. Session: planned (QMP/guest-agent harness) |
-| T0-22 | Keyboard-only operation | E-CI, E-VMW | Unit: Tab and arrow order, Return/Space/Escape, search ↔ grid, the empty window list never focused, focus-ring pixels at each scale. Session: the T0-21 path with keys only (Meta or Alt+F1, typing, arrows, Return, Escape, Meta+Alt+P). Owner: no mouse; the amber ring always visible | Unit: **yes**. Session: planned |
-| T0-23 | Scaling | E-CI, E-VMW | Unit, at scale factors 1, 1.5 and 2 on a 1920×1080 offscreen screen: tiles inside the launcher and non-overlapping, minimum target size, names up to 20 characters not truncated, the taskbar fits Applications, three task buttons and Leave at 960 px. Session: `kscreen-doctor` 1.5/2/1 with AT-SPI geometry. Owner: screenshots at 100/150/200 % | Unit: **yes**. Session: planned |
-| T0-24 | Screen reader | E-CI, E-VMW | Session: AT-SPI roles and names of the taskbar and launcher; Meta+Alt+S starts Orca; Orca's debug log shows each focused tile name. Owner: audible speech through both start paths | Planned (informational until three green runs) |
+| T0-21 | Taskbar and launcher work | E-CI, E-VMW | Unit: one task button per window, activation signals, search, launch, empty states. Session: launch two apps from the launcher, see both in the taskbar, switch between them (KWin's active window agrees). Owner: the same with the mouse | Unit: **yes**. Session: **yes** (`session-test` S5–S7) |
+| T0-22 | Keyboard-only operation | E-CI, E-VMW | Unit: Tab and arrow order, Return/Space/Escape, search ↔ grid, the empty window list never focused, focus-ring pixels at each scale. Session: the T0-21 path with keys only (Meta or Alt+F1, typing, arrows, Return, Escape, Meta+Alt+P). Owner: no mouse; the amber ring always visible | Unit: **yes**. Session: **yes** (`session-test` S4, S8, S9) |
+| T0-23 | Scaling | E-CI, E-VMW | Unit, at scale factors 1, 1.5 and 2 on a 1920×1080 offscreen screen: tiles inside the launcher and non-overlapping, minimum target size, names up to 20 characters not truncated, the taskbar fits Applications, three task buttons and Leave at 960 px. Session: `kscreen-doctor` 1.5/2/1 with AT-SPI geometry. Owner: screenshots at 100/150/200 % | Unit: **yes**. Session: informational (`session-test` S11) |
+| T0-24 | Screen reader | E-CI, E-VMW | Session: AT-SPI roles and names of the taskbar and launcher; Meta+Alt+S starts Orca; Orca's debug log shows each focused tile name. Owner: audible speech through both start paths | Informational (`session-test` S10) until three consecutive green runs |
 | T0-25 | Resource baseline | E-CI, E-VMW | No pass/fail yet. `STAROS-IDLE-REPORT` 240 s after ready, 60 s window: PSS of every live-user process (smaps_rollup), session CPU % of one CPU, memory in use, renderer and package versions. CI reports median, min and max of three boots, labelled "not a performance claim" | **yes** (`idle`, `idle-summary`) |
 | T0-26 | Image policy | E-CI | `check-image-policy.sh` on the built root file system: no forbidden variable names; root locked; `liveuser` 1000:1000 with `/bin/bash`, not in wheel; sudoers file 0440 and valid; sshd masked; no getty autologin; `display-manager.service` is the live session unit; `default.target` is graphical; `staros.desktop` valid; shell files installed with no private Plasma import; overlay files unowned or package backup files | **yes** (`build`; the build fails on a violation) |
 
@@ -67,6 +67,13 @@ How the CI evidence is produced:
   installs the three Plasma packages with `kpackagetool6` into a scratch home,
   and runs `qmltestrunner` at `QT_SCALE_FACTOR` 1, 1.5 and 2. Each run must
   report the scale it asked for.
+- `tests/session/session_test.py` (job `session-test`) boots the ISO with a
+  QEMU guest agent port and drives the session with real key presses over
+  QMP. Each step is checked against KWin's own view (a test-time KWin script
+  reporting the window list and active window over D-Bus), the shell's
+  accessibility tree over AT-SPI, and screen dumps. Helpers are copied to
+  `/run/staros-test` at test time; nothing is added to the image. It prints
+  `EVIDENCE <scenario> PASS|FAIL|INFO` lines and a step summary.
 - The screen dump analysis (`tests/iso/screen.py`) counts the rows of
   taskbar colour at the bottom of the screen and the share of desktop colour
   above it. It is informational until it has been green in three consecutive

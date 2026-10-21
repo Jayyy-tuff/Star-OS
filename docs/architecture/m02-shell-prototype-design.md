@@ -860,6 +860,12 @@ the corresponding open unknowns below.
   through exactly enough for the band check (45 rows of taskbar colour).
 - plasmashell's `console.info` lines reach the journal (`STAROS-SHELL ready
   ... gridUnit=18 taskbarHeight=45`, `catalogue=3`, `tasks=0`).
+- Over AT-SPI (CI run 11), plasmashell exposes the taskbar as a `tool bar`
+  named "Taskbar" containing 'Applications', the 'Open windows' list and
+  'Leave'. The at-spi2-core at the snapshot names the push-button role
+  "button" (not "push button" as written above), and Qt marks a focus scope
+  as focused while one of its children has focus, so tests look for the
+  deepest focused object.
 - With the software scene graph, Qt Quick Test's `grabImage()` returns device
   pixels with no pixel ratio, cropped to the item's logical size; ListView
   applies model changes at polish time. The unit tests account for both.
