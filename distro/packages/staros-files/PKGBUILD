@@ -1,0 +1,53 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Star OS Files (M0.3). Built in CI by scripts/build-packages.sh from a
+# tarball of the checked-out repository (ADR-0009). The version is fixed and
+# bumped in reviewed changes, so the ISO's package manifest stays stable.
+# At run time the QML module StarOS.Shell comes from the ISO's shell tree
+# (/usr/lib/qt6/qml/StarOS/Shell), which no package owns yet.
+
+pkgname=staros-files
+pkgver=0.3.0
+pkgrel=1
+pkgdesc='Star OS file manager'
+arch=(x86_64)
+url='https://github.com/Jayyy-tuff/Star-OS'
+license=(GPL-3.0-or-later)
+# No split debug package; no LTO for the static QML module library.
+options=(!debug !lto)
+depends=(
+  gcc-libs
+  glibc
+  kcoreaddons
+  kio
+  kservice
+  qt6-base
+  qt6-declarative
+  qt6-svg
+)
+makedepends=(
+  cmake
+  extra-cmake-modules
+  ninja
+)
+checkdepends=(
+  desktop-file-utils
+)
+source=(star-os-src.tar.gz)
+sha256sums=('SKIP')
+
+build() {
+  cmake -B build -S star-os-src/apps/files -G Ninja \
+    -DCMAKE_INSTALL_PREFIX=/usr \
+    -DCMAKE_BUILD_TYPE=RelWithDebInfo \
+    -DBUILD_TESTING=ON
+  cmake --build build
+}
+
+check() {
+  QT_QPA_PLATFORM=offscreen QT_QUICK_BACKEND=software \
+    ctest --test-dir build --output-on-failure
+}
+
+package() {
+  DESTDIR="$pkgdir" cmake --install build
+}

@@ -1,0 +1,13 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+[Desktop Entry]
+Type=Application
+Name=Files
+GenericName=File Manager
+Comment=Browse, open and organise your files
+Exec=staros-files %U
+Icon=system-file-manager
+Terminal=false
+MimeType=inode/directory;
+Categories=Qt;KDE;System;FileTools;FileManager;
+Keywords=folder;file;manager;explorer;browse;
+StartupNotify=true
