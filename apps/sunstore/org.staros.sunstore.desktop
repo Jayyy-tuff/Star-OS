@@ -1,0 +1,12 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+[Desktop Entry]
+Type=Application
+Name=Sun Store
+GenericName=Software Store
+Comment=Find and install apps from Flathub
+Exec=staros-sunstore
+Icon=system-software-install
+Terminal=false
+Categories=Qt;System;PackageManager;
+Keywords=apps;install;software;store;flatpak;flathub;
+StartupNotify=true

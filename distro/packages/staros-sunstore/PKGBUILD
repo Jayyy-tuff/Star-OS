@@ -1,0 +1,64 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Star OS Sun Store (M0.3, ADR-0010). Built in CI by scripts/build-packages.sh
+# from a tarball of the checked-out repository (ADR-0009). The version is
+# fixed and bumped in reviewed changes, so the ISO's package manifest stays
+# stable. At run time the QML module StarOS.Shell comes from the ISO's shell
+# tree (/usr/lib/qt6/qml/StarOS/Shell), which no package owns yet.
+#
+# flathub.flatpakrepo is Flathub's own remote definition (URL, title and
+# signing key). Its checksum is pinned: a changed file stops the build until
+# a reviewed change records the new checksum. Until the first CI run has
+# been reviewed and its checksum recorded, the placeholder fails the build.
+
+pkgname=staros-sunstore
+pkgver=0.3.0
+pkgrel=1
+pkgdesc='Star OS app store for Flatpak apps from Flathub'
+arch=(x86_64)
+url='https://github.com/Jayyy-tuff/Star-OS'
+license=(GPL-3.0-or-later)
+# No split debug package; no LTO for the static QML module library.
+options=(!debug !lto)
+depends=(
+  flatpak
+  gcc-libs
+  glibc
+  karchive
+  qt6-base
+  qt6-declarative
+  qt6-svg
+)
+makedepends=(
+  cmake
+  extra-cmake-modules
+  ninja
+)
+checkdepends=(
+  desktop-file-utils
+)
+source=(
+  star-os-src.tar.gz
+  flathub.flatpakrepo::https://dl.flathub.org/repo/flathub.flatpakrepo
+)
+sha256sums=(
+  'SKIP'
+  'PINNED_IN_CI'
+)
+
+build() {
+  cmake -B build -S star-os-src/apps/sunstore -G Ninja \
+    -DCMAKE_INSTALL_PREFIX=/usr \
+    -DCMAKE_BUILD_TYPE=RelWithDebInfo \
+    -DBUILD_TESTING=ON
+  cmake --build build
+}
+
+check() {
+  QT_QPA_PLATFORM=offscreen QT_QUICK_BACKEND=software \
+    ctest --test-dir build --output-on-failure
+}
+
+package() {
+  DESTDIR="$pkgdir" cmake --install build
+  install -Dm644 flathub.flatpakrepo "$pkgdir/usr/share/staros-sunstore/flathub.flatpakrepo"
+}

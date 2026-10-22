@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- SPDX-License-Identifier: GPL-3.0-or-later -->
+<!-- A catalogue in the shape of Flathub's AppStream data; the apps are made up. -->
+<components version="1.0" origin="flathub">
+  <component type="desktop-application">
+    <id>org.example.Editor</id>
+    <name>Example Editor</name>
+    <name xml:lang="de">Beispiel-Editor</name>
+    <summary>Edit plain text</summary>
+    <summary xml:lang="de">Text bearbeiten</summary>
+    <description>
+      <p>Writes <em>text</em> files.</p>
+      <p xml:lang="de">Schreibt Textdateien.</p>
+      <ul>
+        <li>Fast</li>
+        <li xml:lang="de">Schnell</li>
+        <li>Small</li>
+      </ul>
+    </description>
+    <icon type="stock">accessories-text-editor</icon>
+    <icon type="cached" width="64" height="64">org.example.Editor.png</icon>
+    <icon type="cached" width="128" height="128">org.example.Editor.png</icon>
+    <categories>
+      <category>Utility</category>
+      <category>TextEditor</category>
+    </categories>
+    <developer id="example.org">
+      <name>Example Developers</name>
+    </developer>
+    <project_license>GPL-3.0-or-later</project_license>
+    <releases>
+      <release version="2.1" timestamp="1700000000"/>
+      <release version="2.0" timestamp="1600000000"/>
+    </releases>
+    <custom>
+      <value key="flathub::manifest">https://example.org/manifest</value>
+      <value key="flathub::verification::verified">true</value>
+    </custom>
+  </component>
+  <component type="desktop">
+    <id>org.example.Game.desktop</id>
+    <name xml:lang="fr">Jeu exemple</name>
+    <name>Example Game</name>
+    <summary>Play a game</summary>
+    <developer_name>Game Maker</developer_name>
+    <categories>
+      <category>Game</category>
+    </categories>
+    <icon type="cached" width="64" height="64">org.example.Game.png</icon>
+  </component>
+  <component type="runtime">
+    <id>org.example.Platform</id>
+    <name>Example Platform</name>
+  </component>
+  <component type="desktop-application">
+    <name>No id</name>
+  </component>
+</components>
