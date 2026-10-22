@@ -64,12 +64,12 @@ class HelperTest(unittest.TestCase):
         self.assertIn("outside", detail)
         self.assertFalse(session_test.launcher_geometry({"role": "application"})[0])
 
-    def test_outline_lists_named_objects(self):
-        outline = json.loads(session_test.outline(TREE))
+    def test_named_objects(self):
+        outline = json.loads(session_test.named_objects(TREE))
         self.assertEqual(outline[0], ["application", "plasmashell"])
         self.assertIn(["list", "Open windows"], outline)
         self.assertNotIn(["frame", ""], outline)
-        self.assertEqual(len(json.loads(session_test.outline(TREE, limit=2))), 2)
+        self.assertEqual(len(json.loads(session_test.named_objects(TREE, limit=2))), 2)
 
     def test_qcode(self):
         self.assertEqual([session_test.qcode(c) for c in "Kon 1"], ["k", "o", "n", "spc", "1"])

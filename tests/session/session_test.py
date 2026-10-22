@@ -387,7 +387,7 @@ def run_scenarios(s):
         json.dump(tree, f, indent=1)
     for name in ("Places", "Folder contents"):
         s.check("S12", bool(find(tree, role="list", name=name)),
-                f"Files shows a list named {name!r}: {outline(tree)}")
+                f"Files shows a list named {name!r}: {named_objects(tree)}")
     s.screenshot("S12-files")
 
     # S13: Sun Store from the launcher. No user remote exists, so it asks
@@ -399,7 +399,7 @@ def run_scenarios(s):
     with open(os.path.join(s.log_dir, "atspi-sunstore.json"), "w") as f:
         json.dump(tree, f, indent=1)
     s.check("S13", bool(find(tree, role=BUTTON, name="Enable Flathub")),
-            f"Sun Store shows an 'Enable Flathub' button: {outline(tree)}")
+            f"Sun Store shows an 'Enable Flathub' button: {named_objects(tree)}")
     code, out, _ = s.as_user(["/usr/bin/flatpak", "remotes", "--user", "--columns=name"], timeout=30)
     s.check("S13", code == 0 and not out.strip(), f"no Flatpak remote was added: {out.strip()!r}")
     s.screenshot("S13-sunstore")
@@ -421,7 +421,7 @@ def launch(s, text):
     s.keys("ret")
 
 
-def outline(tree, limit=40):
+def named_objects(tree, limit=40):
     """Roles and names of a tree's named objects, for evidence lines."""
     named = [(n.get("role"), n.get("name")) for n in find(tree) if n.get("name")]
     return json.dumps(named[:limit])
