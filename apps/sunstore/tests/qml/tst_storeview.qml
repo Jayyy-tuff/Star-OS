@@ -136,6 +136,13 @@ Item {
             tryVerify(() => appList.currentItem !== null, 5000, "a current app");
         }
 
+        // Rows place a child that just became visible only when they
+        // polish; until then a click at the child would miss it.
+        function click(item) {
+            tryVerify(() => !isPolishScheduled(item.parent), 5000, "the row has placed its buttons");
+            mouseClick(item);
+        }
+
         function test_accessible_structure() {
             compare(sections.Accessible.role, Accessible.PageTabList);
             compare(sections.Accessible.name, "Store sections");
@@ -184,19 +191,16 @@ Item {
             compare(empty.text, "Can't reach Flathub. Check your network connection.");
             const retry = findChild(view, "retryButton");
             verify(retry.visible);
-            // The status row places a button that just appeared when it
-            // polishes; click where it is drawn.
-            waitForRendering(view);
-            mouseClick(retry);
+            click(retry);
             compare(fakeStore.calls, ["refresh"]);
         }
 
         function test_tabs_choose_the_section() {
-            mouseClick(findChild(view, "installedTab"));
+            click(findChild(view, "installedTab"));
             compare(fakeApps.section, "installed");
             verify(findChild(view, "installedTab").checked);
             verify(!findChild(view, "categories").visible, "categories only in Discover");
-            mouseClick(findChild(view, "discoverTab"));
+            click(findChild(view, "discoverTab"));
             compare(fakeApps.section, "discover");
             verify(findChild(view, "categories").visible);
         }
@@ -241,7 +245,7 @@ Item {
             verify(!findChild(appPage, "installButton").visible);
             tryVerify(() => open.activeFocus, 5000, "Open has the focus");
             keyClick(Qt.Key_Space);
-            mouseClick(remove);
+            click(remove);
             compare(fakeStore.calls, ["permissions:org.example.Game", "open:org.example.Game", "remove:org.example.Game"]);
         }
 
