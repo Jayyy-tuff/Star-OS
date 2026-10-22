@@ -38,7 +38,9 @@ must not grant itself root, and must work on the live medium.
 - The remote definition is Flathub's `flathub.flatpakrepo` (URL, title and
   signing key), downloaded when the package is built, with a pinned sha256,
   and shipped at `/usr/share/staros-sunstore/flathub.flatpakrepo`. Flatpak
-  verifies Flathub's signatures with that key.
+  verifies Flathub's signatures with that key. The pinned file (CI run 13,
+  2026-10-22) carries "Flathub Repo Signing Key <flathub@flathub.org>",
+  primary key fingerprint `6E5C 05D9 79C7 6DAF 93C0 8135 4184 DD4D 907A 7CAE`.
 - Each app page lists the app's static permissions (network, display,
   devices, file system, bus names) from its Flathub metadata before install.
 - The catalogue is Flathub's AppStream data in the user installation, read

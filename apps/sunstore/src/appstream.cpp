@@ -71,7 +71,6 @@ QString description(QXmlStreamReader &reader)
 CatalogueApp component(QXmlStreamReader &reader, const QString &iconDir)
 {
     CatalogueApp app;
-    QString icon64;
     while (reader.readNextStartElement()) {
         const auto name = reader.name();
         if (name == QLatin1String("id")) {
