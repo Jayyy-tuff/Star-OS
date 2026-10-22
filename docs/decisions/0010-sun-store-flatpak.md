@@ -30,7 +30,11 @@ must not grant itself root, and must work on the live medium.
   --noninteractive -y <id>`, `update --noninteractive -y`, and `run <id>`
   (detached). App ids must match a strict reverse-DNS pattern before they are
   passed; anything else is refused without starting flatpak.
-- No Flatpak remote exists in the image. On first start Sun Store shows:
+- No Flatpak remote exists in the image. Arch's `flatpak` package ships
+  Flathub as a static system-wide remote
+  (`/usr/share/flatpak/remotes.d/flathub.flatpakrepo`; found by the image
+  policy check in CI run 16), so the ISO build does not extract that file
+  (`NoExtract` in the build-time pacman configuration). On first start Sun Store shows:
   "Sun Store installs apps from Flathub, a community app store. Star OS does
   not review these apps." with "Enable Flathub" and "Not now". Only "Enable
   Flathub" adds the remote, for the current user. "Not now" closes Sun Store
@@ -56,6 +60,10 @@ must not grant itself root, and must work on the live medium.
   Flatpak's static permissions are not a complete security boundary (for
   example X11 or full home access); the permission list names those plainly.
 - On the live medium installed apps disappear at shutdown and consume RAM.
+- Leaving out a file of the `flatpak` package means `pacman -Qk flatpak`
+  reports it missing on the live image. An installed system (Phase 2) needs
+  the same rule in its own `/etc/pacman.conf`, or the file returns with the
+  next flatpak update.
 - Parsing flatpak's text output ties Sun Store to flatpak's table format
   (tab-separated without a terminal, checked against flatpak 1.18.4). A
   libflatpak backend would avoid that; it is a later option.

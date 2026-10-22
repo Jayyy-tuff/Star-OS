@@ -82,6 +82,18 @@ retitle_boot_entries() {
     log "Boot menu entries renamed ($uefi UEFI, $bios BIOS)"
 }
 
+# Arch's flatpak package ships Flathub as a static system-wide remote. Star OS
+# adds Flathub per user, only after the person agrees in Sun Store (ADR-0010),
+# so the image does not extract that file. The image policy check verifies
+# that no system remote exists.
+skip_static_flatpak_remote() {
+    local pacman_conf=$1 path=usr/share/flatpak/remotes.d/flathub.flatpakrepo count
+    count=$(grep -cx '\[options\]' "$pacman_conf" || true)
+    ((count == 1)) || die "expected one [options] section in $pacman_conf, found $count"
+    sed -i "/^\[options\]\$/a NoExtract = $path" "$pacman_conf"
+    log "Not extracting /$path (Flathub is added per user after consent)"
+}
+
 # Adds [staros], the repository of Star OS packages from
 # scripts/build-packages.sh, to the profile's pacman.conf. The package list
 # may only ask for staros-* packages when STAROS_LOCAL_REPO is set.
@@ -198,6 +210,7 @@ assemble_profile() {
     cat -- "$overlay_dir/profiledef.append.sh" >>"$profile/profiledef.sh"
     pin_repositories "$profile/pacman.conf"
     add_local_repository "$profile/pacman.conf"
+    skip_static_flatpak_remote "$profile/pacman.conf"
     retitle_boot_entries "$profile"
 }
 

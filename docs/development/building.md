@@ -22,7 +22,10 @@ The profile is made from:
    `STAROS_LOCAL_REPO=<dir>`. It is added to the profile's `pacman.conf`
    only; the image's own `/etc/pacman.conf` does not list it. Without it the
    build stops, because `packages.x86_64.append` lists `staros-*` packages;
-6. the boot parameter `cow_spacesize=50%` on every boot entry (through
+6. `NoExtract` for the static Flathub remote of Arch's `flatpak` package
+   (`/usr/share/flatpak/remotes.d/flathub.flatpakrepo`) in the profile's
+   `pacman.conf`: Flathub is added per user after consent (ADR-0010);
+7. the boot parameter `cow_spacesize=50%` on every boot entry (through
    `kernel_params_x86_64` in `profiledef.append.sh`), so per-user Flatpak apps
    fit in the live medium's RAM-backed writable layer. The build checks every
    generated boot entry for it.

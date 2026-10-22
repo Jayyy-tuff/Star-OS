@@ -163,6 +163,9 @@ Plasma side (`shell/plasma/`):
   from `https://dl.flathub.org/repo/flathub.flatpakrepo` with a pinned
   sha256 (recorded after review of the first CI run, like the package
   manifest). Nothing is added to `/etc/flatpak`; there is no system remote.
+  Arch's `flatpak` package ships one in
+  `/usr/share/flatpak/remotes.d/flathub.flatpakrepo`; the ISO build does not
+  extract it (`NoExtract` in the build-time `pacman.conf`).
 - UI: search field; Discover (catalogue, by category), Installed, Updates;
   app page with icon, name, developer, verified badge, licence, summary,
   description, permissions, Install / Remove / Open, progress and errors.
