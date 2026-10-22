@@ -11,8 +11,13 @@ FocusScope {
     id: root
 
     // A model with one row per window and the roles 'display' (title),
-    // 'AppName' and 'IsActive'. Roles may be missing; they are read defensively.
+    // 'AppName', 'AppId' and 'IsActive'. Roles may be missing; they are read
+    // defensively.
     property var tasksModel: null
+    // Where the taskbar is on its screen, for the glass. The defaults assume a
+    // full-width taskbar at the bottom edge.
+    property point glassOrigin: Qt.point(0, Screen.height - root.height)
+    property size glassScreenSize: Qt.size(Screen.width, Screen.height)
 
     signal launcherRequested()
     signal activateRequested(int row)
@@ -24,9 +29,17 @@ FocusScope {
     Accessible.role: Accessible.ToolBar
     Accessible.name: qsTr("Taskbar")
 
-    Rectangle {
-        anchors.fill: parent
-        color: Theme.taskbar
+    // One pixel wider on each side and taller at the bottom, so that at the
+    // screen edges only the top edge line of the glass shows.
+    GlassSurface {
+        objectName: "glass"
+        x: -1
+        y: 0
+        width: root.width + 2
+        height: root.height + 1
+        radius: 0
+        wallpaperOrigin: Qt.point(root.glassOrigin.x - 1, root.glassOrigin.y)
+        screenSize: root.glassScreenSize
     }
 
     ShellButton {
@@ -89,6 +102,7 @@ FocusScope {
             y: Theme.spacing / 2
             title: task.model.display ?? ""
             appName: task.model.AppName ?? ""
+            appId: task.model.AppId ?? ""
             isActive: task.model.IsActive === true
             onClicked: {
                 openWindows.currentIndex = task.index;

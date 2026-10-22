@@ -2,8 +2,9 @@
 import QtQuick
 
 // Test double for the launcher catalogue interface (model, count, filter,
-// launch(row)). It uses libtaskmanager's role names, and records launches
-// instead of starting anything.
+// launch(row)). It uses libtaskmanager's role names (AppId is a desktop
+// storage id, as for launcher rows), and records launches instead of starting
+// anything.
 Item {
     id: catalogue
 
@@ -25,7 +26,8 @@ Item {
         const matches = catalogue.apps.filter(app => app.AppName.toLowerCase().includes(needle));
         matches.sort((a, b) => a.AppName.localeCompare(b.AppName));
         for (const app of matches) {
-            rows.append({AppName: app.AppName, GenericName: app.GenericName, display: app.AppName});
+            rows.append({AppName: app.AppName, GenericName: app.GenericName, AppId: app.AppId ?? "",
+                         display: app.AppName});
         }
     }
 

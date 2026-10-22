@@ -6,11 +6,11 @@
                 "Name": "Star OS project"
             }
         ],
-        "Description": "Star OS prototype shell (M0.2): taskbar and full-screen launcher",
+        "Description": "Star OS prototype shell (M0.3): glass taskbar and full-screen launcher",
         "Id": "org.staros.shell",
         "License": "GPL-3.0-or-later",
         "Name": "Star OS shell (prototype)",
-        "Version": "0.2",
+        "Version": "0.3",
         "Website": "https://github.com/Jayyy-tuff/Star-OS"
     },
     "X-KDE-ParentApp": "org.kde.plasmashell",

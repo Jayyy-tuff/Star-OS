@@ -7,7 +7,8 @@ import org.kde.taskmanager as TaskManager
 // Phase 1 replaces this backend (a Star OS KService model, or a recorded kicker
 // exception), not the StarOS.Shell views.
 //
-// Interface used by StarOS.Shell's Launcher: model, count, filter (writable),
+// Interface used by StarOS.Shell's Launcher: model (with libtaskmanager's
+// roles, among them AppName, GenericName and AppId), count, filter (writable),
 // launch(row) returning true when a launch was requested.
 Item {
     id: catalogue
@@ -16,12 +17,14 @@ Item {
     readonly property var model: searchable
     readonly property int count: searchable.count
 
-    // Desktop ids that the iteration-0 probe found installed and visible at the
-    // pinned snapshot. Tests never assume their order or number.
+    // KDE applications that the iteration-0 probe found installed and visible
+    // at the pinned snapshot, then the Star OS applications (M0.3 packages).
+    // Tests never assume their order or number.
     readonly property list<string> desktopIds: [
         "org.kde.konsole.desktop",
         "systemsettings.desktop",
-        "org.kde.kmenuedit.desktop"
+        "org.staros.files.desktop",
+        "org.staros.sunstore.desktop"
     ]
 
     visible: false

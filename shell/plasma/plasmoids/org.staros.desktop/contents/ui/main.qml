@@ -1,9 +1,21 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 import QtQuick
 import org.kde.plasma.plasmoid
+import StarOS.Shell
 
-// Star OS desktop containment (M0.2): shows only the wallpaper, which libplasma
-// draws behind the containment (org.kde.color in Theme.desktop, set by the
-// shell package's layout.js). No icons, no context menu, no toolbox.
+// Star OS desktop containment: draws the Star OS wallpaper. libplasma's colour
+// wallpaper (org.kde.color in Theme.desktop, set by layout.js) shows until the
+// SVG is rendered. Glass surfaces lay out the same image at screen size, so
+// they line up with this one. No icons, no context menu, no toolbox.
 ContainmentItem {
+    id: root
+
+    Image {
+        anchors.fill: parent
+        source: Theme.wallpaper
+        sourceSize: Qt.size(root.width, root.height)
+        fillMode: Image.PreserveAspectCrop
+        asynchronous: true
+        Accessible.ignored: true
+    }
 }

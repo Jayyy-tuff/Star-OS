@@ -1,13 +1,18 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: GPL-3.0-or-later
-"""Static checks of the Star OS shell sources in shell/ (M0.2, ADR-0008).
+"""Static checks of the Star OS shell sources in shell/ (M0.2, ADR-0008; M0.3).
 
 - Plasma package metadata is valid JSON with the expected structure, and each
   KPlugin Id matches its directory.
 - Every file has an SPDX licence line or a .license sidecar.
 - No file mentions 'org.kde.plasma.private' (private Plasma QML API).
-- StarOS.Shell imports only QtQuick and QtQuick.Templates, and its qmldir
-  lists exactly the module's QML files.
+- StarOS.Shell imports only QtQuick, QtQuick.Templates, QtQuick.Effects and
+  QtQuick.Window, and its qmldir lists exactly the module's QML files.
+- SVG artwork is well-formed, starts with a CC-BY-SA-4.0 SPDX comment, keeps
+  to what Qt's SVG renderer draws (no filters, masks, clip paths, patterns,
+  images, text or CSS), and stays under its size limit; the icons are the five
+  256x256 Star OS icons; every wallpaper colour lies between Theme.qml's
+  wallpaperDarkest and wallpaperLightest, channel by channel, and both are used.
 
 Prints one CHECK line per check. Exit status 0 if all passed, 1 otherwise.
 """
@@ -16,14 +21,25 @@ import json
 import os
 import re
 import sys
+import xml.etree.ElementTree as ET
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 SHELL = os.path.join(ROOT, "shell")
 MODULE = os.path.join(SHELL, "qml", "StarOS", "Shell")
-MODULE_IMPORTS = {"QtQuick", "QtQuick.Templates"}
+MODULE_IMPORTS = {"QtQuick", "QtQuick.Templates", "QtQuick.Effects", "QtQuick.Window"}
 PACKAGE_KINDS = {"shells": "Plasma/Shell", "plasmoids": "Plasma/Applet"}
 SPDX = "SPDX-License-Identifier:"
 PRIVATE = "org.kde.plasma.private"
+ARTWORK_SPDX = re.compile(r"\A\s*<!--\s*SPDX-License-Identifier:\s*CC-BY-SA-4\.0\s*-->")
+ICONS = {"terminal.svg", "settings.svg", "files.svg", "sun-store.svg", "moon-browser.svg"}
+ICON_LIMIT = 8 * 1024
+WALLPAPER = os.path.join(MODULE, "wallpaper", "star-os-glass.svg")
+WALLPAPER_LIMIT = 64 * 1024
+# Elements and attributes outside what the M0.3 artwork may use.
+SVG_ELEMENTS = {"svg", "defs", "g", "path", "rect", "circle", "ellipse", "line", "polyline",
+                "polygon", "linearGradient", "radialGradient", "stop"}
+SVG_ATTRIBUTES_FORBIDDEN = {"style", "class", "filter", "mask", "clip-path"}
+COLOUR_ATTRIBUTES = ("fill", "stroke", "stop-color")
 
 
 def shell_files(top=SHELL):
@@ -127,6 +143,94 @@ def check_module():
     return problems
 
 
+def svg_tag(element):
+    return element.tag.split("}", 1)[-1]
+
+
+def check_svg(path, limit):
+    """Problems of one artwork file, and its parsed root (None if unreadable)."""
+    problems = []
+    with open(path, encoding="utf-8") as f:
+        text = f.read()
+    if not ARTWORK_SPDX.match(text):
+        problems.append(f"{rel(path)} does not start with a CC-BY-SA-4.0 SPDX comment")
+    size = len(text.encode("utf-8"))
+    if size >= limit:
+        problems.append(f"{rel(path)} is {size} bytes, limit {limit}")
+    try:
+        root = ET.fromstring(text)
+    except ET.ParseError as err:
+        return problems + [f"{rel(path)}: {err}"], None
+    for element in root.iter():
+        tag = svg_tag(element)
+        if tag not in SVG_ELEMENTS:
+            problems.append(f"{rel(path)}: element <{tag}> is not allowed")
+        for name in element.attrib:
+            if name.split("}", 1)[-1] in SVG_ATTRIBUTES_FORBIDDEN:
+                problems.append(f"{rel(path)}: attribute {name!r} on <{tag}> is not allowed")
+    return problems, root
+
+
+def hex_colour(value):
+    """(r, g, b) of '#rgb' or '#rrggbb', or None."""
+    match = re.fullmatch(r"#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})", value.strip())
+    if not match:
+        return None
+    digits = match.group(1)
+    if len(digits) == 3:
+        digits = "".join(c * 2 for c in digits)
+    return tuple(int(digits[i:i + 2], 16) for i in (0, 2, 4))
+
+
+def theme_colour(name):
+    with open(os.path.join(MODULE, "Theme.qml"), encoding="utf-8") as f:
+        match = re.search(r"property color " + name + r': "(#[0-9a-fA-F]{6})"', f.read())
+    return hex_colour(match.group(1)) if match else None
+
+
+def check_artwork():
+    problems = []
+    icon_dir = os.path.join(MODULE, "icons")
+    names = set(os.listdir(icon_dir)) if os.path.isdir(icon_dir) else set()
+    if names != ICONS:
+        problems.append(f"StarOS.Shell/icons has {sorted(names)}, expected {sorted(ICONS)}")
+    for name in sorted(names & ICONS):
+        found, root = check_svg(os.path.join(icon_dir, name), ICON_LIMIT)
+        problems += found
+        if root is not None and root.get("viewBox") != "0 0 256 256":
+            problems.append(f"StarOS.Shell/icons/{name}: viewBox is not '0 0 256 256'")
+    for path in shell_files():
+        if path.endswith(".svg") and os.path.dirname(path) not in (icon_dir, os.path.dirname(WALLPAPER)):
+            problems.append(f"{rel(path)}: artwork belongs in StarOS.Shell/icons or wallpaper")
+    if not os.path.isfile(WALLPAPER):
+        return problems + [f"{rel(WALLPAPER)} is missing"]
+    found, root = check_svg(WALLPAPER, WALLPAPER_LIMIT)
+    problems += found
+    darkest, lightest = theme_colour("wallpaperDarkest"), theme_colour("wallpaperLightest")
+    if darkest is None or lightest is None:
+        return problems + ["Theme.qml lacks wallpaperDarkest or wallpaperLightest"]
+    if root is None:
+        return problems
+    used = set()
+    for element in root.iter():
+        for name in COLOUR_ATTRIBUTES:
+            value = element.get(name)
+            if value is None or value == "none" or value.startswith("url(#"):
+                continue
+            colour = hex_colour(value)
+            if colour is None:
+                problems.append(f"{rel(WALLPAPER)}: {name}={value!r} is not a hex colour")
+            elif not all(lo <= c <= hi for lo, c, hi in zip(darkest, colour, lightest)):
+                problems.append(f"{rel(WALLPAPER)}: {value} is outside wallpaperDarkest.."
+                                "wallpaperLightest")
+            else:
+                used.add(colour)
+    for name, colour in (("wallpaperDarkest", darkest), ("wallpaperLightest", lightest)):
+        if colour not in used:
+            problems.append(f"{rel(WALLPAPER)} does not use Theme.{name}")
+    return problems
+
+
 def main():
     files = list(shell_files())
     checks = [
@@ -134,6 +238,7 @@ def main():
         ("SPDX licence lines", check_licences(files)),
         (f"no {PRIVATE} in shell/", check_private_api(files)),
         ("StarOS.Shell imports and qmldir", check_module()),
+        ("Artwork (licence, SVG subset, sizes, wallpaper colours)", check_artwork()),
     ]
     failed = False
     for name, problems in checks:

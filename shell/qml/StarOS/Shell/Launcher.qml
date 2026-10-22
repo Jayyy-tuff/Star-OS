@@ -7,9 +7,10 @@ import QtQuick.Templates as T
 // Full-screen launcher content: search field and application grid.
 //
 // The catalogue is any object with: model (rows with the roles 'AppName',
-// 'GenericName', 'display'), count, a writable string 'filter', and
+// 'GenericName', 'AppId', 'display'), count, a writable string 'filter', and
 // launch(row) returning true when the launch was requested. The host decides
 // where the catalogue comes from (Plasma adapter, or FakeCatalogue in tests).
+// The launcher covers the whole screen, so its glass starts at (0, 0).
 FocusScope {
     id: root
 
@@ -47,9 +48,12 @@ FocusScope {
             && event.text.charCodeAt(0) !== 0x7f && (event.modifiers & blocked) === 0;
     }
 
-    Rectangle {
+    GlassSurface {
+        objectName: "glass"
         anchors.fill: parent
-        color: Theme.launcherBackdrop
+        radius: 0
+        wallpaperOrigin: Qt.point(0, 0)
+        screenSize: Qt.size(root.width, root.height)
     }
 
     T.TextField {
@@ -73,6 +77,7 @@ FocusScope {
         Accessible.name: qsTr("Search applications")
 
         background: Rectangle {
+            radius: Theme.controlRadius
             color: Theme.searchField
             border.width: 1
             border.color: Theme.searchBorder
@@ -112,6 +117,7 @@ FocusScope {
 
         FocusFrame {
             visible: searchField.activeFocus
+            radius: Theme.controlRadius
         }
     }
 
@@ -163,6 +169,7 @@ FocusScope {
             height: Theme.tileHeight
             appName: tile.model.AppName ?? (tile.model.display ?? "")
             genericName: tile.model.GenericName ?? ""
+            appId: tile.model.AppId ?? ""
             onClicked: {
                 grid.currentIndex = tile.index;
                 root.launchRow(tile.index);

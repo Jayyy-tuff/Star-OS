@@ -6,7 +6,7 @@ import QtTest
 import StarOS.Shell
 
 // Launcher: search, keyboard path between search and grid, launching, empty
-// state, accessible names and the visible focus ring.
+// state, accessible names, application icons and the visible focus ring.
 Item {
     id: root
 
@@ -34,11 +34,13 @@ Item {
         name: "Launcher"
         when: windowShown
 
-        // Sorted by name in the catalogue: KMenuEdit, Konsole, System Settings.
+        // Sorted by name in the catalogue: Files, Konsole, Sun Store,
+        // System Settings.
         readonly property var defaultApps: [
-            {AppName: "Konsole", GenericName: "Terminal"},
-            {AppName: "System Settings", GenericName: "Configuration Tools"},
-            {AppName: "KMenuEdit", GenericName: "Menu Editor"}
+            {AppName: "Konsole", GenericName: "Terminal", AppId: "org.kde.konsole.desktop"},
+            {AppName: "System Settings", GenericName: "System Settings", AppId: "systemsettings.desktop"},
+            {AppName: "Files", GenericName: "File Manager", AppId: "org.staros.files.desktop"},
+            {AppName: "Sun Store", GenericName: "Software Store", AppId: "org.staros.sunstore.desktop"}
         ]
         property Item searchField
         property GridView grid
@@ -106,7 +108,7 @@ Item {
         }
 
         function test_initial_state() {
-            compare(grid.count, 3);
+            compare(grid.count, 4);
             compare(fakeCatalogue.filter, "");
             verify(!emptyState.visible);
             compare(launcher.Accessible.role, Accessible.Pane);
@@ -119,13 +121,62 @@ Item {
         function test_tiles_have_accessible_names() {
             const tile = focusedTileAfterDown();
             compare(tile.Accessible.role, Accessible.Button);
-            compare(tile.Accessible.name, "KMenuEdit");
-            compare(tile.Accessible.description, "Menu Editor");
+            compare(tile.Accessible.name, "Files");
+            compare(tile.Accessible.description, "File Manager");
         }
 
         function focusedTileAfterDown() {
             keyClick(Qt.Key_Down);
             return focusedTile();
+        }
+
+        // Each tile shows the artwork for its AppId; an app without one gets
+        // the monogram of its name.
+        function test_tiles_show_app_icons() {
+            fakeCatalogue.apps = defaultApps.concat([{AppName: "zeta", GenericName: "No icon"}]);
+            compare(grid.count, 5);
+            tryVerify(() => grid.itemAtIndex(4) !== null, 5000, "every tile is created");
+            for (let i = 0; i < grid.count; ++i) {
+                const tile = grid.itemAtIndex(i);
+                const icon = findChild(tile, "icon");
+                verify(icon !== null, "tile " + i + " has an icon");
+                compare(icon.name, tile.Accessible.name);
+                const artwork = findChild(icon, "artwork");
+                const monogram = findChild(icon, "monogram");
+                if (tile.Accessible.name === "zeta") {
+                    compare(icon.appId, "");
+                    verify(monogram.visible && !artwork.visible, "zeta shows its monogram");
+                    compare(findChild(icon, "monogramLetter").text, "Z");
+                } else {
+                    verify(icon.appId.endsWith(".desktop"), "tile " + i + " has the storage id " + icon.appId);
+                    tryCompare(artwork, "status", Image.Ready, 5000, icon.appId + " artwork loads");
+                    verify(artwork.visible && !monogram.visible, icon.appId + " shows its artwork");
+                }
+            }
+        }
+
+        // The launcher covers the screen, so its glass starts at (0, 0). Under
+        // the software scene graph it is the opaque fallback.
+        function test_glass_backdrop() {
+            const glass = findChild(launcher, "glass");
+            verify(glass !== null);
+            compare(glass.radius, 0);
+            compare(glass.wallpaperOrigin.x, 0);
+            compare(glass.wallpaperOrigin.y, 0);
+            compare(glass.width, launcher.width);
+            compare(glass.height, launcher.height);
+            compare(glass.screenSize.width, launcher.width);
+            compare(glass.screenSize.height, launcher.height);
+            if (glass.blurAvailable) {
+                return;
+            }
+            waitForRendering(launcher);
+            const img = grabImage(launcher);
+            const p = Math.floor(4 * Screen.devicePixelRatio);
+            const ok = Math.abs(img.red(p, p) - Theme.glassFallback.r * 255) <= 2
+                && Math.abs(img.green(p, p) - Theme.glassFallback.g * 255) <= 2
+                && Math.abs(img.blue(p, p) - Theme.glassFallback.b * 255) <= 2;
+            verify(ok, "launcher backdrop " + img.pixel(p, p) + ", expected " + Theme.glassFallback);
         }
 
         function test_typing_filters() {
@@ -145,14 +196,14 @@ Item {
 
         function test_enter_in_search_launches_first_match() {
             keyClick(Qt.Key_Enter);
-            compare(fakeCatalogue.launched, ["KMenuEdit"]);
+            compare(fakeCatalogue.launched, ["Files"]);
             compare(closeSpy.count, 1);
         }
 
         function test_refused_launch_keeps_launcher_open() {
             fakeCatalogue.launchResult = false;
             keyClick(Qt.Key_Return);
-            compare(fakeCatalogue.launched, ["KMenuEdit"]);
+            compare(fakeCatalogue.launched, ["Files"]);
             compare(closeSpy.count, 0);
         }
 
@@ -165,7 +216,7 @@ Item {
 
         function test_tab_moves_to_grid() {
             keyClick(Qt.Key_Tab);
-            compare(focusedTile().Accessible.name, "KMenuEdit");
+            compare(focusedTile().Accessible.name, "Files");
         }
 
         function test_arrows_and_return_launch_a_tile() {
@@ -181,11 +232,11 @@ Item {
         function test_space_launches_a_tile() {
             focusedTileAfterDown();
             keyClick(Qt.Key_Space);
-            compare(fakeCatalogue.launched, ["KMenuEdit"]);
+            compare(fakeCatalogue.launched, ["Files"]);
         }
 
         function test_click_launches_a_tile() {
-            mouseClick(grid.itemAtIndex(2));
+            mouseClick(grid.itemAtIndex(3));
             compare(fakeCatalogue.launched, ["System Settings"]);
             compare(closeSpy.count, 1);
         }
@@ -223,7 +274,7 @@ Item {
             launcher.reset();
             compare(searchField.text, "");
             compare(fakeCatalogue.filter, "");
-            compare(grid.count, 3);
+            compare(grid.count, 4);
             compare(grid.currentIndex, 0);
             verify(searchField.activeFocus);
         }

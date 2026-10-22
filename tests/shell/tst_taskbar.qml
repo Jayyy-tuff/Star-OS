@@ -6,8 +6,8 @@ import QtTest
 import StarOS.Shell
 
 // Taskbar: window buttons from a model with libtaskmanager's role names,
-// keyboard order, signals, the empty list, Escape left to the host, and the
-// visible focus ring.
+// application icons, keyboard order, signals, the empty list, Escape left to
+// the host, and the visible focus ring.
 Item {
     id: root
 
@@ -83,8 +83,10 @@ Item {
         function init() {
             taskbar.tasksModel = windows;
             windows.clear();
-            windows.append({display: "Konsole - ~", AppName: "Konsole", IsActive: true});
-            windows.append({display: "", AppName: "System Settings", IsActive: false});
+            windows.append({display: "Konsole - ~", AppName: "Konsole", AppId: "org.kde.konsole",
+                            IsActive: true});
+            windows.append({display: "", AppName: "System Settings", AppId: "systemsettings",
+                            IsActive: false});
             list.currentIndex = 0;
             launcherSpy.clear();
             activateSpy.clear();
@@ -126,7 +128,8 @@ Item {
             // An empty title falls back to the application name.
             compare(taskAt(1).Accessible.name, "System Settings");
             compare(taskAt(1).Accessible.description, "Window");
-            windows.append({display: "Third", AppName: "Konsole", IsActive: false});
+            windows.append({display: "Third", AppName: "Konsole", AppId: "org.kde.konsole",
+                            IsActive: false});
             compare(list.count, 3);
         }
 
@@ -137,7 +140,32 @@ Item {
             tryVerify(() => taskAt(0) !== null && taskAt(0).Accessible.name === "Only a title",
                       5000, "the delegate shows the title");
             compare(taskAt(0).Accessible.description, "Window");
+            const icon = findChild(taskAt(0), "icon");
+            compare(icon.appId, "");
+            verify(findChild(icon, "monogram").visible, "no AppId: the monogram shows");
+            compare(findChild(icon, "monogramLetter").text, "O");
             taskbar.tasksModel = windows;
+        }
+
+        // Windows report bare app ids; known ones show Star OS artwork, others
+        // the monogram of the application name.
+        function test_task_buttons_show_app_icons() {
+            windows.append({display: "Example - a window", AppName: "Example", AppId: "org.example.app",
+                            IsActive: false});
+            tryVerify(() => taskAt(2) !== null, 5000, "the third task button exists");
+            const ids = ["org.kde.konsole", "systemsettings", "org.example.app"];
+            for (let row = 0; row < ids.length; ++row) {
+                const icon = findChild(taskAt(row), "icon");
+                verify(icon !== null, "task " + row + " has an icon");
+                compare(icon.appId, ids[row]);
+                verify(icon.width === Theme.taskIconSize && icon.height === Theme.taskIconSize);
+                verify(icon.height <= taskAt(row).height, "the icon fits the button");
+            }
+            const artwork = findChild(findChild(taskAt(0), "icon"), "artwork");
+            tryCompare(artwork, "status", Image.Ready, 5000, "Konsole artwork loads");
+            const other = findChild(taskAt(2), "icon");
+            verify(findChild(other, "monogram").visible && !findChild(other, "artwork").visible);
+            compare(findChild(other, "monogramLetter").text, "E");
         }
 
         function test_arrow_order() {

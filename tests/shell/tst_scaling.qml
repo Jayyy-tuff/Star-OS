@@ -41,9 +41,9 @@ Item {
         when: windowShown
 
         readonly property var apps: [
-            {AppName: "Konsole", GenericName: "Terminal"},
-            {AppName: "System Settings", GenericName: "Configuration Tools"},
-            {AppName: "KMenuEdit", GenericName: "Menu Editor"},
+            {AppName: "Konsole", GenericName: "Terminal", AppId: "org.kde.konsole.desktop"},
+            {AppName: "System Settings", GenericName: "System Settings", AppId: "systemsettings.desktop"},
+            {AppName: "Sun Store", GenericName: "Software Store", AppId: "org.staros.sunstore.desktop"},
             {AppName: "Accessibility Helper", GenericName: "Exactly twenty characters"},
             {AppName: "An Application With A Rather Long Descriptive Name", GenericName: "Long"},
             {AppName: "Calculator", GenericName: "Scientific Calculator"}
@@ -55,7 +55,7 @@ Item {
             windows.clear();
             for (let i = 0; i < 3; ++i) {
                 windows.append({display: "Window with a long title number " + (i + 1),
-                                AppName: "Konsole", IsActive: i === 0});
+                                AppName: "Konsole", AppId: "org.kde.konsole", IsActive: i === 0});
             }
         }
 
@@ -102,8 +102,12 @@ Item {
                     verify(!overlap(r, other), "tile " + i + " overlaps another tile");
                 }
                 rects.push(r);
+                const icon = findChild(tile, "icon");
                 const label = findChild(tile, "label");
-                verify(label !== null);
+                verify(icon !== null && label !== null);
+                const iconRect = rectOf(icon, tile);
+                verify(inside(iconRect, tile.width, tile.height), "tile " + i + " icon inside the tile");
+                verify(rectOf(label, tile).y >= iconRect.y + iconRect.h - 0.5, "tile " + i + " label below the icon");
                 if (tile.Accessible.name.length <= 20) {
                     verify(!label.truncated, "'" + tile.Accessible.name + "' is truncated");
                 }
@@ -128,6 +132,8 @@ Item {
                 const task = list.itemAtIndex(i);
                 verify(task.width >= 2 * Theme.minTarget, "task button " + i + " is wide enough");
                 verify(task.height >= Theme.minTarget, "task button " + i + " is tall enough");
+                verify(inside(rectOf(findChild(task, "icon"), task), task.width, task.height),
+                       "task button " + i + " icon inside the button");
                 // Long titles elide; the accessible name keeps the full title.
                 compare(task.Accessible.name, "Window with a long title number " + (i + 1));
             }

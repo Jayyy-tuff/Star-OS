@@ -9,8 +9,9 @@ import org.kde.taskmanager as TaskManager
 import StarOS.Shell
 
 // Plasma adapter of the Star OS taskbar (M0.2, ADR-0008). This file and its two
-// siblings are the only Star OS QML that imports Plasma or KDE modules; every
-// visible element comes from the Plasma-free StarOS.Shell module.
+// siblings are the only Star OS QML in the taskbar that imports Plasma or KDE
+// modules; every visible element comes from the Plasma-free StarOS.Shell module.
+// The window rows carry libtaskmanager's AppId role, which picks the icons.
 //
 // The window list uses plasmashell's packaged window-management grant
 // (org.kde.plasmashell.desktop); nothing here bypasses KWin's permission checks.
@@ -33,9 +34,13 @@ ContainmentItem {
     }
 
     Taskbar {
+        id: taskbar
         anchors.fill: parent
         focus: true
         tasksModel: windows
+        // The panel spans the bottom edge of its screen (layout.js).
+        glassOrigin: Qt.point(0, Screen.height - taskbar.height)
+        glassScreenSize: Qt.size(Screen.width, Screen.height)
 
         onLauncherRequested: launcherWindow.toggleLauncher()
         onActivateRequested: row => {

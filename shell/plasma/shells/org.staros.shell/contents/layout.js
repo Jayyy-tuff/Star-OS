@@ -4,10 +4,11 @@
 
 for (const desk of desktopsForActivity(currentActivity())) {
     // org.kde.color is a pure-QML wallpaper in plasma-workspace; a valid
-    // wallpaper plugin avoids the 6.7 startup hang on a missing one.
+    // wallpaper plugin avoids the 6.7 startup hang on a missing one. The
+    // org.staros.desktop containment draws the Star OS wallpaper over it.
     desk.wallpaperPlugin = "org.kde.color";
     desk.currentConfigGroup = ["Wallpaper", "org.kde.color", "General"];
-    desk.writeConfig("Color", "#24364a"); // Theme.desktop, matched by CI
+    desk.writeConfig("Color", "#24364a"); // Theme.desktop, until the SVG is drawn
     desk.locked = true;
 }
 

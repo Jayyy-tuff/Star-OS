@@ -6,11 +6,11 @@
                 "Name": "Star OS project"
             }
         ],
-        "Description": "Star OS prototype desktop: shows the wallpaper only",
+        "Description": "Star OS prototype desktop: shows the Star OS wallpaper only",
         "Id": "org.staros.desktop",
         "License": "GPL-3.0-or-later",
         "Name": "Star OS desktop",
-        "Version": "0.2",
+        "Version": "0.3",
         "Website": "https://github.com/Jayyy-tuff/Star-OS"
     },
     "NoDisplay": true,

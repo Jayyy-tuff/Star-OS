@@ -2,13 +2,14 @@
 import QtQuick
 import QtQuick.Templates as T
 
-// One open window in the taskbar. The label elides; the full title stays in
-// the accessible name.
+// One open window in the taskbar: a small application icon and the title. The
+// label elides; the full title stays in the accessible name.
 T.AbstractButton {
     id: control
 
     property string title: ""
     property string appName: ""
+    property string appId: ""
     property bool isActive: false
 
     text: control.title !== "" ? control.title : control.appName
@@ -30,31 +31,53 @@ T.AbstractButton {
     }
 
     background: Rectangle {
-        color: control.down ? Theme.taskbarButtonPressed : Theme.taskbarButton
+        radius: Theme.controlRadius
+        color: control.down ? Theme.glassButtonPressed
+            : control.isActive ? Theme.glassButtonActive : Theme.glassButton
 
         Rectangle {
             visible: control.isActive
-            anchors.left: parent.left
-            anchors.right: parent.right
+            anchors.horizontalCenter: parent.horizontalCenter
             anchors.bottom: parent.bottom
+            width: parent.width - 2 * Theme.controlRadius
             height: Theme.activeIndicatorHeight
+            radius: height / 2
             color: Theme.activeIndicator
         }
     }
 
-    contentItem: Text {
-        objectName: "label"
-        text: control.text
-        color: Theme.text
-        font: Theme.metrics.font
-        elide: Text.ElideRight
-        leftPadding: Theme.spacing
-        rightPadding: Theme.spacing
-        verticalAlignment: Text.AlignVCenter
-        Accessible.ignored: true
+    contentItem: Item {
+        AppIcon {
+            id: appIcon
+            objectName: "icon"
+            anchors.left: parent.left
+            anchors.leftMargin: Theme.spacing
+            anchors.verticalCenter: parent.verticalCenter
+            width: Theme.taskIconSize
+            height: Theme.taskIconSize
+            appId: control.appId
+            name: control.appName !== "" ? control.appName : control.title
+        }
+
+        Text {
+            objectName: "label"
+            anchors.left: appIcon.right
+            anchors.right: parent.right
+            anchors.top: parent.top
+            anchors.bottom: parent.bottom
+            leftPadding: Theme.spacing / 2
+            rightPadding: Theme.spacing
+            text: control.text
+            color: Theme.text
+            font: Theme.metrics.font
+            elide: Text.ElideRight
+            verticalAlignment: Text.AlignVCenter
+            Accessible.ignored: true
+        }
     }
 
     FocusFrame {
         visible: control.activeFocus
+        radius: Theme.controlRadius
     }
 }

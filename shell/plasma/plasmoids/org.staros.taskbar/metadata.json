@@ -10,7 +10,7 @@
         "Id": "org.staros.taskbar",
         "License": "GPL-3.0-or-later",
         "Name": "Star OS taskbar",
-        "Version": "0.2",
+        "Version": "0.3",
         "Website": "https://github.com/Jayyy-tuff/Star-OS"
     },
     "NoDisplay": true,

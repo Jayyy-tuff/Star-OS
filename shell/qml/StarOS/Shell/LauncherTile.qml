@@ -2,13 +2,14 @@
 import QtQuick
 import QtQuick.Templates as T
 
-// One application in the launcher: a monogram (no icon themes in M0.2) and
-// the application name. Screen readers get the name and the generic name.
+// One application in the launcher: its icon (AppIcon) and name on a glass
+// tile. Screen readers get the name and the generic name.
 T.AbstractButton {
     id: control
 
     property string appName: ""
     property string genericName: ""
+    property string appId: ""
 
     text: control.appName
     implicitWidth: Theme.tileWidth
@@ -29,33 +30,27 @@ T.AbstractButton {
     }
 
     background: Rectangle {
-        color: control.down ? Theme.taskbarButtonPressed : Theme.tile
+        radius: Theme.controlRadius
+        color: control.down ? Theme.glassButtonPressed : Theme.tileGlass
     }
 
     contentItem: Item {
-        Rectangle {
-            id: monogram
+        AppIcon {
+            id: appIcon
+            objectName: "icon"
             anchors.horizontalCenter: parent.horizontalCenter
             anchors.top: parent.top
             anchors.topMargin: Theme.spacing
-            width: Theme.monogramSize
-            height: Theme.monogramSize
-            color: Theme.monogram
-
-            Text {
-                anchors.centerIn: parent
-                text: control.appName.length > 0 ? control.appName.charAt(0).toUpperCase() : ""
-                color: Theme.text
-                font.pixelSize: Math.round(Theme.monogramSize * 0.55)
-                font.bold: true
-                Accessible.ignored: true
-            }
+            width: Theme.tileIconSize
+            height: Theme.tileIconSize
+            appId: control.appId
+            name: control.appName
         }
 
         Text {
             objectName: "label"
-            anchors.top: monogram.bottom
-            anchors.topMargin: Theme.spacing / 2
+            anchors.top: appIcon.bottom
+            anchors.topMargin: Theme.spacing / 4
             anchors.left: parent.left
             anchors.right: parent.right
             anchors.bottom: parent.bottom
@@ -75,5 +70,6 @@ T.AbstractButton {
 
     FocusFrame {
         visible: control.activeFocus
+        radius: Theme.controlRadius
     }
 }

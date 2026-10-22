@@ -27,7 +27,8 @@ T.AbstractButton {
     }
 
     background: Rectangle {
-        color: control.down ? Theme.taskbarButtonPressed : Theme.taskbarButton
+        radius: Theme.controlRadius
+        color: control.down ? Theme.glassButtonPressed : Theme.glassButton
     }
 
     contentItem: Text {
@@ -43,5 +44,6 @@ T.AbstractButton {
 
     FocusFrame {
         visible: control.activeFocus
+        radius: Theme.controlRadius
     }
 }

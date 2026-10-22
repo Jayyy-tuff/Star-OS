@@ -2,17 +2,23 @@
 """Screen dump helpers for the ISO tests (standard library only).
 
 QEMU's QMP screendump writes binary PPM (P6). These helpers parse it, convert
-it to PNG for upload, and measure the Star OS taskbar band and desktop colour
-using the reserved colours of shell/qml/StarOS/Shell/Theme.qml.
+it to PNG for upload, and locate the Star OS taskbar. The taskbar is frosted
+glass over the wallpaper (M0.3), so it has no fixed colour; what it does have
+is a straight top edge across the whole screen. analyse() reports the
+strongest such edge in the bottom quarter of the screen.
 """
 
 import struct
 import zlib
 
-TASKBAR = (0x16, 0x20, 0x2C)
-TASKBAR_BUTTON = (0x1F, 0x2B, 0x3A)
-DESKTOP = (0x24, 0x36, 0x4A)
-TOLERANCE = 3
+# Search window and acceptance rules for the taskbar's top edge.
+SEARCH_FRACTION = 0.25  # the bottom quarter of the screen
+MIN_ROWS = 8  # the taskbar is at least this tall; also skips a bottom border line
+MIN_EDGE = 6  # minimum change of a row's mean colour, 0..255 per channel
+SEGMENTS = 16  # the edge must show in most of these column segments
+MIN_COVERAGE = 0.75
+LINE_ROWS = 2  # a highlight line this thin on top of the edge belongs to the band
+BAND_ROWS = 16  # rows averaged for the colours above and below the edge
 
 
 class Image:
@@ -78,53 +84,93 @@ def png_bytes(image):
             + chunk(b"IDAT", zlib.compress(raw, 6)) + chunk(b"IEND", b""))
 
 
-def close(colour, want, tolerance=TOLERANCE):
-    return all(abs(a - b) <= tolerance for a, b in zip(colour, want))
+def mean_colour(data):
+    """Mean (r, g, b) of packed RGB bytes."""
+    count = len(data) // 3
+    return tuple(sum(data[c::3]) / count for c in range(3))
 
 
-def row_fraction(image, y, colours):
-    """Fraction of a row's pixels close to any of COLOURS."""
+def difference(a, b):
+    """Largest per-channel difference of two colours."""
+    return max(abs(x - y) for x, y in zip(a, b))
+
+
+def hex_colour(colour):
+    return "#%02x%02x%02x" % tuple(round(c) for c in colour)
+
+
+def _segments(image, y):
+    """Mean colours of row Y in SEGMENTS equal column ranges."""
     row = image.row(y)
-    hits = 0
-    for x in range(image.width):
-        px = tuple(row[3 * x:3 * x + 3])
-        if any(close(px, c) for c in colours):
-            hits += 1
-    return hits / image.width
+    bounds = [image.width * i // SEGMENTS for i in range(SEGMENTS + 1)]
+    return [mean_colour(row[3 * a:3 * b]) for a, b in zip(bounds, bounds[1:]) if b > a]
 
 
-def taskbar_rows(image, min_fraction=0.5):
-    """Counts rows from the bottom that are mostly taskbar or button colour.
+def _coverage(image, y, strength):
+    """Fraction of column segments in which rows Y-1 and Y differ by at least a
+    third of the whole rows' difference STRENGTH; relative to the edge, so that
+    pixel noise in a narrow segment does not count."""
+    above, below = _segments(image, y - 1), _segments(image, y)
+    threshold = max(MIN_EDGE / 2, strength / 3)
+    hits = sum(1 for a, b in zip(above, below) if difference(a, b) >= threshold)
+    return hits / len(above)
 
-    The taskbar spans the screen width; its buttons, labels and focus ring
-    cover part of each row, so a row counts when at least MIN_FRACTION of
-    its pixels are taskbar or task-button colour.
+
+def taskbar_edge(image):
+    """Finds the taskbar's top edge: (first row of the band, edge strength).
+
+    Candidates are boundaries between adjacent rows in the bottom quarter that
+    leave at least MIN_ROWS rows below. The strongest change of the row mean
+    that spans most of the width wins. A highlight line of up to LINE_ROWS rows
+    right above it (the glass draws a 1 px edge line) is counted into the band.
+    Returns (None, strength) when no boundary qualifies.
     """
-    rows = 0
-    for y in range(image.height - 1, -1, -1):
-        if row_fraction(image, y, (TASKBAR, TASKBAR_BUTTON)) < min_fraction:
+    if image.width < SEGMENTS or image.height < 2 * MIN_ROWS:
+        return None, 0.0
+    top = max(1, image.height - max(MIN_ROWS + 1, int(image.height * SEARCH_FRACTION)))
+    last = image.height - MIN_ROWS
+    means = {y: mean_colour(image.row(y)) for y in range(top - 1 - LINE_ROWS, image.height)
+             if y >= 0}
+    strength = {y: difference(means[y - 1], means[y]) for y in range(top, last + 1)}
+    for y in sorted(strength, key=lambda k: (-strength[k], -k)):
+        if strength[y] < MIN_EDGE:
             break
-        rows += 1
-    return rows
-
-
-def desktop_fraction(image):
-    """Fraction of pixels above the taskbar that have the desktop colour."""
-    limit = image.height - taskbar_rows(image)
-    if limit <= 0:
-        return 0.0
-    step = max(1, limit // 50)
-    sampled = [row_fraction(image, y, (DESKTOP,)) for y in range(0, limit, step)]
-    return sum(sampled) / len(sampled)
+        if _coverage(image, y, strength[y]) < MIN_COVERAGE:
+            continue
+        edge = y
+        for step in range(1, LINE_ROWS + 1):
+            above = y - step
+            if above - 1 not in means or difference(means[above - 1], means[above]) < strength[y] / 2:
+                break
+            edge = above
+        return edge, strength[y]
+    return None, max(strength.values(), default=0.0)
 
 
 def analyse(image):
-    """Returns the screen facts that the boot test logs."""
+    """Returns the screen facts that the boot and session tests log.
+
+    taskbar_rows is the height of the band below the strongest full-width edge
+    in the bottom quarter (0 if there is none), edge its strength (largest
+    per-channel change of the row mean colour, 0..255), and above / below the
+    mean colours of up to BAND_ROWS rows on either side.
+    """
     centre = image.pixel(image.width // 2, image.height // 2)
-    return {
+    edge, strength = taskbar_edge(image)
+    facts = {
         "width": image.width,
         "height": image.height,
-        "taskbar_rows": taskbar_rows(image),
-        "desktop_fraction": round(desktop_fraction(image), 3),
-        "centre": "#%02x%02x%02x" % centre,
+        "taskbar_rows": 0 if edge is None else image.height - edge,
+        "edge": round(strength, 1),
+        "above": "",
+        "below": "",
+        "centre": hex_colour(centre),
     }
+    if edge is not None:
+        start = max(0, edge - BAND_ROWS)
+        facts["above"] = hex_colour(mean_colour(b"".join(image.row(y) for y in range(start, edge))))
+        # Below the edge line itself, inside the band.
+        first = min(image.height - 1, edge + LINE_ROWS)
+        stop = min(image.height, first + BAND_ROWS)
+        facts["below"] = hex_colour(mean_colour(b"".join(image.row(y) for y in range(first, stop))))
+    return facts
