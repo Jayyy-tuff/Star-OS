@@ -16,3 +16,7 @@ file_permissions+=(
   ["/usr/local/libexec/staros-boot-check"]="0:0:755"
   ["/usr/local/libexec/staros-session-report"]="0:0:755"
 )
+# Replaces %KERNEL_PARAMS% in every boot entry (scripts/build-iso.sh checks
+# them): the copy-on-write RAM disk may grow to half the memory, so per-user
+# Flatpak apps from Sun Store fit on the live medium (M0.3).
+kernel_params_x86_64="cow_spacesize=50%"

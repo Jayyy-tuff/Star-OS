@@ -1,11 +1,13 @@
 #!/usr/bin/env bash
 # SPDX-License-Identifier: GPL-3.0-or-later
 #
-# Checks the built live image's root file system against the M0.2 policy
-# (ADR-0008, docs/security/threat-model.md): no CI-only bypass variables, the
-# least-privilege live user, live-only login and service settings, the Star OS
-# shell files, and overlay files that no package owns (or that are backup files
-# of their package). Prints one POLICY line per check and fails on any FAIL.
+# Checks the built live image's root file system against the M0.2 and M0.3
+# policy (ADR-0008, ADR-0009, ADR-0010, docs/security/threat-model.md): no
+# CI-only bypass variables, the least-privilege live user, live-only login and
+# service settings, the Star OS shell files, overlay files that no package owns
+# (or that are backup files of their package), the Star OS apps, no Flatpak
+# remote before the user agrees, and no build-time repository in the image.
+# Prints one POLICY line per check and fails on any FAIL.
 #
 # Usage: scripts/ci/check-image-policy.sh AIROOTFS [REPORT]
 #   AIROOTFS  mkarchiso's work/x86_64/airootfs
@@ -202,6 +204,48 @@ overlay_paths_unowned() {
     ((bad == 0))
 }
 
+star_os_apps_installed() {
+    local pkg app
+    for pkg in staros-files staros-sunstore; do
+        pacman_root -Q "$pkg" >/dev/null 2>&1 || { echo "    $pkg is not installed"; return 1; }
+    done
+    for app in staros-files staros-sunstore; do
+        [[ -x $root/usr/bin/$app ]] || { echo "    /usr/bin/$app is missing"; return 1; }
+    done
+}
+
+app_entries_valid() {
+    local entry
+    for entry in org.staros.files org.staros.sunstore; do
+        desktop-file-validate "$root/usr/share/applications/$entry.desktop" \
+            || { echo "    $entry.desktop is not valid"; return 1; }
+    done
+}
+
+flathub_file_shipped() {
+    local file="$root/usr/share/staros-sunstore/flathub.flatpakrepo"
+    [[ -f $file ]] && grep -qx '\[Flatpak Repo\]' "$file" \
+        && grep -qx 'Url=https://dl.flathub.org/repo/' "$file" \
+        && [[ $(pacman_root -Qqo "$file" 2>/dev/null) == staros-sunstore ]]
+}
+
+# Flathub is added per user, after consent (ADR-0010): no system remote,
+# neither configured nor as a static remote file of a package.
+no_system_flatpak_remote() {
+    local found
+    found=$(find "$root/etc/flatpak/remotes.d" "$root/usr/share/flatpak/remotes.d" -type f 2>/dev/null || true)
+    [[ -z $found ]] || { printf '    %s\n' "${found//"$root"/}"; return 1; }
+    if [[ -f $root/var/lib/flatpak/repo/config ]] \
+        && grep -q '^\[remote ' "$root/var/lib/flatpak/repo/config"; then
+        echo "    /var/lib/flatpak/repo/config defines a remote"
+        return 1
+    fi
+}
+
+no_build_repository() {
+    ! grep -rqs '^[[:space:]]*\[staros\]' "$root/etc/pacman.conf" "$root/etc/pacman.d"
+}
+
 info_present() {
     local path
     for path in usr/bin/kwriteconfig6 usr/bin/kscreen-doctor usr/bin/gsettings \
@@ -229,6 +273,11 @@ check "staros.desktop passes desktop-file-validate (DesktopNames allowed)" sessi
 check "Star OS shell files are installed" shell_files_present
 check "no org.kde.plasma.private import in Star OS shell files" no_private_plasma_imports
 check "overlay and shell paths are unowned or package backup files" overlay_paths_unowned
+check "staros-files and staros-sunstore are installed" star_os_apps_installed
+check "Files and Sun Store desktop entries pass desktop-file-validate" app_entries_valid
+check "staros-sunstore ships Flathub's remote file" flathub_file_shipped
+check "no system-wide Flatpak remote" no_system_flatpak_remote
+check "the image's pacman configuration has no [staros] build repository" no_build_repository
 info_present
 
 if ((failures > 0)); then

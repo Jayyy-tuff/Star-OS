@@ -1,13 +1,18 @@
 #!/usr/bin/env bash
 # SPDX-License-Identifier: GPL-3.0-or-later
 #
-# Builds the Star OS live ISO prototype (milestones M0.1 and M0.2).
+# Builds the Star OS live ISO prototype (milestones M0.1 to M0.3).
 #
 # The archiso profile is assembled from the releng profile of the installed,
 # pinned archiso version plus the Star OS overlay in distro/archiso/staros/
 # (ADR-0001) and the Star OS shell files in shell/ (ADR-0008), with packages
 # pinned to the baseline snapshot (ADR-0002). Must run as root on Arch Linux;
 # see docs/development/building.md.
+#
+# The Star OS packages (Files, Sun Store; ADR-0009) come from the local
+# repository that scripts/build-packages.sh writes: set STAROS_LOCAL_REPO to
+# its directory. It is used at build time only; the image's /etc/pacman.conf
+# is the pacman package's and does not list it.
 #
 # Writes to out/: the ISO, SHA256SUMS, packages.x86_64.txt, build-info.txt,
 # boot-entries.txt, image-policy.txt and profile.tar.gz (the assembled
@@ -25,6 +30,10 @@ releng_dir=/usr/share/archiso/configs/releng
 mirrorlist_include_re='^Include[[:space:]]*=[[:space:]]*/etc/pacman\.d/mirrorlist[[:space:]]*$'
 boot_title_from='Arch Linux install medium'
 boot_title_to='Star OS live (prototype)'
+# Set by profiledef.append.sh (kernel_params_x86_64); checked on every built
+# boot entry. The live medium's writable layer is a RAM disk of this size, so
+# that per-user Flatpak apps fit (tmpfs only uses memory for written data).
+kernel_params='cow_spacesize=50%'
 
 check_host() {
     local want have
@@ -71,6 +80,48 @@ retitle_boot_entries() {
                "renamed $uefi UEFI and $bios BIOS entries; review the releng format before building"
     grep -rn -- "$boot_title_to" "${files[@]}" | sed "s|^$profile/||" >"$build_dir/boot-entries.txt"
     log "Boot menu entries renamed ($uefi UEFI, $bios BIOS)"
+}
+
+# Adds [staros], the repository of Star OS packages from
+# scripts/build-packages.sh, to the profile's pacman.conf. The package list
+# may only ask for staros-* packages when STAROS_LOCAL_REPO is set.
+add_local_repository() {
+    local pacman_conf=$1 repo=${STAROS_LOCAL_REPO:-}
+    if [[ -z $repo ]]; then
+        if list_entries "$overlay_dir/packages.x86_64.append" | grep -q '^staros-'; then
+            die "packages.x86_64.append lists Star OS packages; build them with" \
+                "scripts/build-packages.sh and set STAROS_LOCAL_REPO to its output directory"
+        fi
+        return 0
+    fi
+    [[ -d $repo ]] || die "STAROS_LOCAL_REPO '$repo' is not a directory"
+    repo=$(cd -- "$repo" && pwd)
+    [[ -f $repo/staros.db ]] || die "$repo/staros.db not found; run scripts/build-packages.sh"
+    ! grep -q '^\[staros\]' "$pacman_conf" || die "$pacman_conf already has a [staros] section"
+    printf '\n[staros]\nSigLevel = Optional TrustAll\nServer = file://%s\n' "$repo" >>"$pacman_conf"
+    log "Added the local repository [staros] at $repo (build time only)"
+}
+
+# Checks that every boot entry mkarchiso wrote (UEFI, BIOS, PXE, loopback)
+# carries kernel_params.
+check_boot_parameters() {
+    local work=$1 file line lines=0 missing=0
+    local -a files
+    mapfile -t files < <(grep -rlE --include='*.cfg' --include='*.conf' --exclude-dir=airootfs \
+        'archisobasedir=' "$work" | sort)
+    for file in "${files[@]}"; do
+        while IFS= read -r line; do
+            lines=$((lines + 1))
+            if [[ " $line " != *" $kernel_params "* ]]; then
+                printf '    %s: %s\n' "${file#"$work"/}" "$line"
+                missing=$((missing + 1))
+            fi
+        done < <(grep -E 'archisobasedir=' -- "$file")
+    done
+    ((lines > 0 && missing == 0)) \
+        || die "expected '$kernel_params' on every boot entry, missing on $missing of $lines" \
+               "(${#files[@]} files); review profiledef.append.sh and the releng format"
+    log "Boot parameters: '$kernel_params' on all $lines boot entries in ${#files[@]} files"
 }
 
 # Prints the profile's boot modes as mkarchiso will read them.
@@ -146,6 +197,7 @@ assemble_profile() {
     install_shell_files "$profile/airootfs"
     cat -- "$overlay_dir/profiledef.append.sh" >>"$profile/profiledef.sh"
     pin_repositories "$profile/pacman.conf"
+    add_local_repository "$profile/pacman.conf"
     retitle_boot_entries "$profile"
 }
 
@@ -172,6 +224,9 @@ write_records() {
         printf 'build_host_kernel=%s\n' "$(uname -r)"
         printf 'iso_package_count=%s\n' "$(wc -l <"$out_dir/packages.x86_64.txt")"
         printf 'staros_shell_sha256=%s\n' "$(shell_tree_hash "$work/x86_64/airootfs")"
+        printf 'staros_packages=%s\n' "$(grep '^staros-' "$out_dir/packages.x86_64.txt" | tr ' \n' '= ' \
+            | sed 's/ $//')"
+        printf 'kernel_params=%s\n' "$kernel_params"
     } >"$out_dir/build-info.txt"
 }
 
@@ -190,6 +245,7 @@ main() {
     log "Running mkarchiso"
     mkarchiso -v -w "$work" -o "$out_dir" "$profile"
 
+    check_boot_parameters "$work"
     log "Disk space after mkarchiso:"
     df -h -- "$build_dir" "$out_dir" | sed 's/^/    /'
     log "Checking the image policy"

@@ -1,6 +1,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 """Unit tests for the pure helpers of session_test.py (no QEMU)."""
 
+import json
 import os
 import sys
 import unittest
@@ -62,6 +63,13 @@ class HelperTest(unittest.TestCase):
         self.assertFalse(ok)
         self.assertIn("outside", detail)
         self.assertFalse(session_test.launcher_geometry({"role": "application"})[0])
+
+    def test_outline_lists_named_objects(self):
+        outline = json.loads(session_test.outline(TREE))
+        self.assertEqual(outline[0], ["application", "plasmashell"])
+        self.assertIn(["list", "Open windows"], outline)
+        self.assertNotIn(["frame", ""], outline)
+        self.assertEqual(len(json.loads(session_test.outline(TREE, limit=2))), 2)
 
     def test_qcode(self):
         self.assertEqual([session_test.qcode(c) for c in "Kon 1"], ["k", "o", "n", "spc", "1"])

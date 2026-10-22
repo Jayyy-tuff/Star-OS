@@ -1,9 +1,10 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 #
-# Milestones M0.1 and M0.2: lint -> build the live ISO in a pinned Arch
-# container -> boot it in QEMU (UEFI and BIOS) into the Star OS prototype
-# session, measure the idle session three times, and compare its packages with
-# the baseline. The Star OS shell's QML unit tests run in parallel with the build.
+# Milestones M0.1 to M0.3: lint -> build and test the Star OS packages (Files,
+# Sun Store) -> build the live ISO in a pinned Arch container with them -> boot
+# it in QEMU (UEFI and BIOS) into the Star OS prototype session, run the
+# session test, measure the idle session three times, and compare its packages
+# with the baseline. The Star OS shell's QML unit tests run in parallel.
 # Test IDs refer to docs/development/test-plan.md.
 
 name: ISO
@@ -46,6 +47,8 @@ jobs:
             distro/archiso/staros/profiledef.append.sh \
             distro/archiso/staros/airootfs/usr/local/libexec/staros-boot-check \
             distro/archiso/staros/airootfs/usr/local/bin/startstaros
+          # PKGBUILDs are bash fragments; makepkg defines and reads their variables.
+          shellcheck --shell=bash --exclude=SC2034,SC2154,SC2164 distro/packages/*/PKGBUILD
       - name: Harness unit tests (boot test, session report format, screen, idle summary)
         run: |
           python3 -m unittest discover -s tests/iso -v
@@ -84,7 +87,7 @@ jobs:
         env:
           STAROS_DISPOSABLE_HOST: "1"
         run: |
-          scripts/ci/prepare-arch-build-host.sh python qt6-declarative kpackage libplasma \
+          scripts/ci/prepare-arch-build-host.sh python qt6-declarative qt6-svg kpackage libplasma \
             plasma-workspace kitemmodels layer-shell-qt noto-fonts
       - name: Shell sources
         run: python3 tests/shell/check_shell_sources.py
@@ -100,9 +103,47 @@ jobs:
           retention-days: 30
           if-no-files-found: warn
 
+  packages:
+    name: Build and test Star OS packages (T0-30, T0-31)
+    needs: lint
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    container:
+      image: archlinux:latest
+    steps:
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+      - name: Prepare pinned Arch build host
+        shell: bash
+        env:
+          STAROS_DISPOSABLE_HOST: "1"
+        run: scripts/ci/prepare-arch-build-host.sh base-devel noto-fonts
+      - name: Build the packages (makepkg runs their C++ and QML tests)
+        shell: bash
+        env:
+          STAROS_DISPOSABLE_HOST: "1"
+        run: scripts/build-packages.sh staros-repo 2>&1 | tee packages.log
+      - name: Upload the package repository
+        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5.0.0
+        with:
+          name: staros-packages
+          path: staros-repo/
+          retention-days: 14
+          if-no-files-found: error
+      - name: Upload package build logs
+        if: always()
+        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5.0.0
+        with:
+          name: staros-package-logs
+          path: |
+            packages.log
+            staros-repo/packages.txt
+            build/packages/*/src/build/Testing/Temporary/*.log
+          retention-days: 30
+          if-no-files-found: warn
+
   build:
     name: Build ISO (T0-02, T0-03)
-    needs: lint
+    needs: [lint, packages]
     runs-on: ubuntu-24.04
     timeout-minutes: 90
     container:
@@ -118,9 +159,13 @@ jobs:
           STAROS_DISPOSABLE_HOST: "1"
         # sudo (visudo) and desktop-file-utils are used by the image policy check.
         run: scripts/ci/prepare-arch-build-host.sh sudo desktop-file-utils
+      - uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5.0.0
+        with:
+          name: staros-packages
+          path: staros-repo
       - name: Build ISO
         shell: bash
-        run: scripts/build-iso.sh 2>&1 | tee build.log
+        run: STAROS_LOCAL_REPO="$PWD/staros-repo" scripts/build-iso.sh 2>&1 | tee build.log
       - name: Upload ISO
         uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5.0.0
         with:

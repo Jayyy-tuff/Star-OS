@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: GPL-3.0-or-later
-"""Drives the Star OS prototype session on the CI-built ISO (M0.2).
+"""Drives the Star OS prototype session on the CI-built ISO (M0.2, M0.3).
 
 Boots the ISO in QEMU/KVM with the graphical profile, a QEMU guest agent port
 and a USB tablet, waits for staros-session-report's verdict, then runs the
@@ -19,6 +19,9 @@ Scenarios:
   S2 test helpers and KWin oracle   S7 both windows in the taskbar
   S3 taskbar over AT-SPI            S8 switch windows with Meta+Alt+P
   S4 Meta opens the launcher        S9 Escape closes the launcher
+  S12 launch Files; its Places and Folder contents lists over AT-SPI
+  S13 launch Sun Store; its first-run "Enable Flathub" button over AT-SPI
+      (CI has no network; nothing is added or downloaded)
   Informational: S11 scaling with kscreen-doctor (AT-SPI geometry and screen
   dumps at 150, 200 and 100 %), S10 Orca (Meta+Alt+S, then a debug Orca's
   speech output for the launcher).
@@ -54,6 +57,10 @@ ORACLE_FILE = "/run/user/1000/staros-oracle.jsonl"
 # Wayland app ids, matched by substring because packaging may prefix them.
 KONSOLE = "konsole"
 SETTINGS = "systemsettings"
+FILES = "org.staros.files"
+SUNSTORE = "org.staros.sunstore"
+# The live medium's writable layer (M0.3, scripts/build-iso.sh).
+KERNEL_PARAM = "cow_spacesize=50%"
 
 QCODES = {" ": "spc", "\n": "ret", "-": "minus", ".": "dot", "/": "slash"}
 
@@ -276,6 +283,10 @@ def run_scenarios(s):
     # plasmashell saves its layout lazily, so the file may appear later.
     code, out, _ = s.guest(["/usr/bin/sh", "-c", "ls /home/liveuser/.config/ | grep appletsrc"])
     s.record("S1", "INFO", "appletsrc files: " + (out.replace("\n", " ").strip() or "none yet"))
+    code, out, _ = s.guest(["/usr/bin/cat", "/proc/cmdline"])
+    s.check("S1", KERNEL_PARAM in out.split(), f"kernel command line has {KERNEL_PARAM}: {out.strip()}")
+    code, out, _ = s.guest(["/usr/bin/df", "-h", "--output=size,used,target", "/run/archiso/cowspace"])
+    s.record("S1", "INFO", "copy-on-write space: " + " ".join(out.split()))
 
     # S2: helpers, KWin oracle and its listener.
     for name in HELPERS:
@@ -367,6 +378,32 @@ def run_scenarios(s):
     report = s.wait_oracle(lambda e: is_active(e, KONSOLE), 20, f"active {KONSOLE}")
     s.check("S9", True, f"Escape returns to Konsole: {json.dumps(report)}")
 
+    # S12: Files from the launcher, with its accessible lists.
+    launch(s, "fil")
+    report = s.wait_oracle(lambda e: is_active(e, FILES), 45, f"active {FILES}")
+    s.check("S12", True, f"Files launched and active per KWin: {json.dumps(report)}")
+    tree = s.atspi("walk", "staros-files", "30")
+    with open(os.path.join(s.log_dir, "atspi-files.json"), "w") as f:
+        json.dump(tree, f, indent=1)
+    for name in ("Places", "Folder contents"):
+        s.check("S12", bool(find(tree, role="list", name=name)),
+                f"Files shows a list named {name!r}: {outline(tree)}")
+    s.screenshot("S12-files")
+
+    # S13: Sun Store from the launcher. No user remote exists, so it asks
+    # before adding Flathub; the test does not press the button.
+    launch(s, "sun")
+    report = s.wait_oracle(lambda e: is_active(e, SUNSTORE), 45, f"active {SUNSTORE}")
+    s.check("S13", True, f"Sun Store launched and active per KWin: {json.dumps(report)}")
+    tree = s.atspi("walk", "staros-sunstore", "30")
+    with open(os.path.join(s.log_dir, "atspi-sunstore.json"), "w") as f:
+        json.dump(tree, f, indent=1)
+    s.check("S13", bool(find(tree, role=BUTTON, name="Enable Flathub")),
+            f"Sun Store shows an 'Enable Flathub' button: {outline(tree)}")
+    code, out, _ = s.as_user(["/usr/bin/flatpak", "remotes", "--user", "--columns=name"], timeout=30)
+    s.check("S13", code == 0 and not out.strip(), f"no Flatpak remote was added: {out.strip()!r}")
+    s.screenshot("S13-sunstore")
+
     # Informational until each has three consecutive green runs (design spec).
     for scenario in (scenario_scaling, scenario_orca):
         try:
@@ -374,6 +411,20 @@ def run_scenarios(s):
         except (CheckFailed, qga.GuestAgentError, boot_test.SetupError, ValueError,
                 KeyError, IndexError) as err:
             s.record(scenario.__name__, "INFO", f"did not complete: {err}")
+
+
+def launch(s, text):
+    """Opens the launcher, types TEXT and launches the first match."""
+    s.keys("meta_l")
+    s.wait_focus("text", "Search applications")
+    s.type_text(text)
+    s.keys("ret")
+
+
+def outline(tree, limit=40):
+    """Roles and names of a tree's named objects, for evidence lines."""
+    named = [(n.get("role"), n.get("name")) for n in find(tree) if n.get("name")]
+    return json.dumps(named[:limit])
 
 
 def overlaps(a, b):
@@ -437,7 +488,7 @@ def scenario_orca(s):
         time.sleep(2)
     code, out, _ = s.guest(["/usr/bin/grep", "-a", "SPEECH OUTPUT", log])
     spoken = [line.split("SPEECH OUTPUT:", 1)[-1].strip() for line in out.splitlines()]
-    heard = [n for n in ("Search applications", "KMenuEdit", "Konsole") if any(n in x for x in spoken)]
+    heard = [n for n in ("Search applications", "Files", "Konsole") if any(n in x for x in spoken)]
     s.record("S10", "INFO", f"names in Orca's speech output: {heard}; last lines: "
              + " | ".join(spoken[-12:]))
     s.guest(["/usr/bin/pkill", "-u", "liveuser", "-x", "orca"])

@@ -26,3 +26,8 @@ python-gobject
 pipewire
 pipewire-pulse
 wireplumber
+# Star OS apps (M0.3, ADR-0009): built from distro/packages/ by
+# scripts/build-packages.sh into the build-time repository [staros].
+# staros-sunstore pulls flatpak.
+staros-files
+staros-sunstore
