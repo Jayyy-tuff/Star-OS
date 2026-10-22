@@ -184,6 +184,9 @@ Item {
             compare(empty.text, "Can't reach Flathub. Check your network connection.");
             const retry = findChild(view, "retryButton");
             verify(retry.visible);
+            // The status row places a button that just appeared when it
+            // polishes; click where it is drawn.
+            waitForRendering(view);
             mouseClick(retry);
             compare(fakeStore.calls, ["refresh"]);
         }
