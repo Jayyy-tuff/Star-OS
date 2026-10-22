@@ -21,10 +21,14 @@ What has been tested:
   presses against KWin's own window list and the accessibility tree (CI run 12,
   2026-10-21).
 
+- **Frosted glass, Files and Sun Store in QEMU (CI, milestone M0.3):** both
+  apps are built and unit-tested as packages, open from the launcher, and
+  expose their accessible lists and buttons; Sun Store asks before adding
+  Flathub and adds nothing on its own (CI run 18, 2026-10-22).
+
 What has **not** been tested: any real hardware, any installation (there is no
-installer yet), the graphical session in VMware, and the M0.3 work in progress
-(frosted glass theme, the Files file manager and the Sun Store app store; see
-the phase plan). This README claims a capability only once a recorded test
+installer yet), the graphical session in VMware, and installing an app from
+Flathub (the CI virtual machine has no internet access). This README claims a capability only once a recorded test
 shows it.
 Prototype ISOs are unsigned test artifacts.
 
@@ -33,7 +37,7 @@ What exists today:
 | Area | Document | State |
 | --- | --- | --- |
 | Build environment inspection | [docs/development/environment-report-2026-10-19.md](docs/development/environment-report-2026-10-19.md) | Done |
-| Phase 0 plan and milestones | [docs/development/phase-0-plan.md](docs/development/phase-0-plan.md) | M0.1 complete; M0.2 (shell prototype) green in CI, VMware run pending; M0.3 (glass, Files, Sun Store) in progress |
+| Phase 0 plan and milestones | [docs/development/phase-0-plan.md](docs/development/phase-0-plan.md) | M0.1 complete; M0.2 (shell prototype) and M0.3 (glass, Files, Sun Store) green in CI, VMware runs pending |
 | Building and boot-testing the ISO | [docs/development/building.md](docs/development/building.md) | Draft |
 | Architecture decision records | [docs/decisions/](docs/decisions/README.md) | Mostly accepted; ADR-0006 deferred to Phase 2 |
 | Test plan | [docs/development/test-plan.md](docs/development/test-plan.md) | Draft |

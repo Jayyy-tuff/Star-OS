@@ -19,7 +19,7 @@ security uncertainties, and record human approval of the architecture.
 | Btrfs snapshot and recovery prototype plan | ADR-0006 | Deferred to Phase 2 with plan |
 | Build environment setup | ADR-0003 + milestone M0.1 | **M0.1 complete** (CI build, QEMU boots, VMware boot) |
 | Qt/QML shell prototype | milestone M0.2 | CI green (run 12); owner's VMware run pending |
-| Glass theme, Files, Sun Store | milestone M0.3 | In progress |
+| Glass theme, Files, Sun Store | milestone M0.3 | CI green (run 18); owner's VMware run pending |
 | Moon Browser integration checklist | — | Removed from the current scope at the owner's request (2026-10-19); the owner will add Moon Browser later. No other browser will be substituted without approval |
 
 ## Smallest useful deliverable: M0.1 — console ISO prototype
@@ -179,7 +179,7 @@ Still to do: keep S10 and S11 informational until they have three consecutive
 green runs; the owner's VMware run (procedure in `test-plan.md`, 3D on and
 off); then the ADR-0004 A/B decision with the CI and VMware numbers.
 
-## M0.3 — frosted glass, Files and Sun Store (in progress)
+## M0.3 — frosted glass, Files and Sun Store (CI green; VMware run pending)
 
 Requested by the owner on 2026-10-22: a frosted glass theme, original icons
 for the terminal, settings and Moon Browser (icon only; no browser is added),
@@ -201,8 +201,57 @@ What exists in the repository:
   repository and the `cow_spacesize=50%` boot parameter; image policy and
   session test additions (S12, S13).
 
-No CI result exists for M0.3 yet. The status below is filled in from CI runs
-only.
+### Status (2026-10-22, CI run 18 on commit a3ce231: every job green)
+
+Measured in CI (QEMU/KVM on GitHub's runners, software rendering with
+llvmpipe; not VMware or hardware results):
+
+- **Packages (T0-30, T0-31):** `staros-files` and `staros-sunstore` build in
+  the pinned container and pass all their tests: Files 6 of 6 (folder model,
+  file operations on temporary folders, places, the view with fakes, the
+  real window, desktop file), Sun Store 7 of 7 (flatpak output parsers,
+  AppStream reader, the store against a fake `flatpak`, the view with a fake
+  store, the real window, desktop file, and ECM's automatic AppStream metadata
+  check, which has no metadata file to validate yet). Three CI
+  runs on the way fixed a test timing issue (clicking a button before its row
+  was laid out) and pinned Flathub's remote file (checksum `3371dd25…`,
+  signing key fingerprint `6E5C05D979C76DAF93C081354184DD4D907A7CAE`).
+- **Image (T0-32):** 854 packages: the 847 of M0.2 plus `composefs`,
+  `flatpak`, `libmalcontent`, `ostree`, `xdg-dbus-proxy`, `staros-files` and
+  `staros-sunstore`. The ISO grows to about 2.18 GB (1,062,288 sectors in
+  run 17). Every image policy check passes. The first M0.3 build (run 16)
+  found that Arch's `flatpak` package ships Flathub as a static system-wide
+  remote; the build no longer extracts that file (ADR-0010).
+  `cow_spacesize=50%` is on all 11 generated boot entries and on the booted
+  kernel command line (2.0 GB of copy-on-write space with 4 GB RAM).
+- **Session (T0-33, T0-34; QEMU):** UEFI and BIOS boots reach the session;
+  S0–S9 pass as in M0.2. S12: typing `fil` and Return opens Files; KWin
+  reports `org.staros.files` active with the title "Files — Home"; AT-SPI
+  shows the "Files toolbar", the "Places" list (Home, Desktop, Documents,
+  Downloads, Music, Pictures, Videos, Trash, Computer) and the "Folder
+  contents" list. S13: `sun` and Return opens Sun Store (`org.staros.sunstore`
+  active); AT-SPI shows the "Store sections" page tabs and the consent dialog
+  with "Enable Flathub" and "Not now"; `flatpak remotes --user` is empty
+  afterwards. Scaling (S11, informational): four tiles inside the launcher
+  with no overlap at 150, 200 and 100 %. Orca (S10, informational) speaks
+  "Files button", "File Manager", "Konsole button" and, for Sun Store, "Enable
+  Flathub? dialog Sun Store installs apps from Flathub, a community app store.
+  Star OS does not review these apps." and "Enable Flathub button".
+- **Glass on screen (informational):** the screen analysis finds the
+  taskbar's top edge 45 rows above the bottom (65 and 90 at 150 and 200 %).
+  The band's mean colour, #11152e, matches the glass tint over the wallpaper
+  (about #10132e by calculation) rather than the opaque fallback #151c33,
+  which suggests the blurred glass path is drawn in the live session. Whether
+  it looks right is the owner's check.
+- **Idle (T0-25):** three boots, all stable. Median (min–max): session PSS
+  775.5 MiB (775.0–780.9), plasmashell 406.4 MiB, kwin_wayland 188.3 MiB,
+  1065 MiB in use, session CPU 0.07 % of one CPU. Compared with M0.2
+  (713.6 MiB, plasmashell 343.6 MiB), plasmashell uses about 62 MiB more,
+  most likely the glass layers and the full-screen wallpaper textures. Not a
+  performance claim.
+
+Still to do: the owner's VMware run (procedure in `test-plan.md`, with
+network for installing an app from Flathub, 3D on and off).
 
 ## Supported hardware assumptions (Phase 0)
 
