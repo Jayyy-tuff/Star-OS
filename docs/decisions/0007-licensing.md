@@ -43,3 +43,15 @@ meant for third-party apps, they can be released under LGPL-3.0-or-later.
 
 - Chosen: GPL-3.0-or-later for original code, CC-BY-SA-4.0 for documentation, separate artwork/trademark policy (to be written). The DCO sign-off for contributions is still a proposal.
 - Approved by: project owner (GitHub @Jayyy-tuff), 2026-10-19, in the AI agent session
+
+## Amendment 2026-10-22: artwork
+
+- Original Star OS artwork (the application icons in
+  `shell/qml/StarOS/Shell/icons/` and the wallpaper in
+  `shell/qml/StarOS/Shell/wallpaper/`, milestone M0.3) is licensed
+  CC-BY-SA-4.0. Each SVG file starts with an SPDX comment;
+  `tests/shell/check_shell_sources.py` checks it.
+- The licence covers the artwork, not the Star OS name. The trademark policy
+  for the name and logo is still to be written.
+- Approved by: project owner (GitHub @Jayyy-tuff), 2026-10-22, in the AI agent
+  session ("CC-BY-SA-4.0 (Recommended)").

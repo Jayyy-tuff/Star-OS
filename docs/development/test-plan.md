@@ -74,10 +74,58 @@ How the CI evidence is produced:
   accessibility tree over AT-SPI, and screen dumps. Helpers are copied to
   `/run/staros-test` at test time; nothing is added to the image. It prints
   `EVIDENCE <scenario> PASS|FAIL|INFO` lines and a step summary.
-- The screen dump analysis (`tests/iso/screen.py`) counts the rows of
-  taskbar colour at the bottom of the screen and the share of desktop colour
-  above it. It is informational until it has been green in three consecutive
-  runs; AT-SPI geometry will be the authority once the session harness exists.
+- The screen dump analysis (`tests/iso/screen.py`) reports the strongest
+  full-width horizontal edge in the bottom quarter of the screen (the frosted
+  glass taskbar's top edge, M0.3), the band height below it and the mean
+  colours on either side. The glass has no fixed colour, so this replaced the
+  M0.2 count of reserved taskbar and desktop colours. It is informational;
+  AT-SPI geometry is the authority.
+
+## Phase 0 tests (milestone M0.3, ADR-0009, ADR-0010)
+
+Design contract: `docs/architecture/m03-glass-files-store-design.md`. As for
+M0.2, a QEMU result is never reported as a VMware or hardware result.
+
+| ID | Test | Env | Pass condition | CI now |
+| --- | --- | --- | --- | --- |
+| T0-30 | Files | E-CI, E-VMW | Unit (`ctest` in the package build), on temporary folders: the folder model lists folders first then names ignoring case, describes items, follows the hidden-files setting and the name filter, refreshes, and reports a missing folder; copy, move, rename, new folder, clipboard copy/cut/paste, Trash, restore, empty Trash and permanent delete through KIO, with bad names refused; programs and desktop entries are never started; places list only existing folders; the view's keyboard paths (Return, Delete, Shift+Delete asks first, Ctrl+C/V, F2, Escape) and accessible names with fake models; the real window shows "Files — <folder>", "Places" and "Folder contents". Session: S12. Owner: the VMware steps below | Unit: **yes** (`packages`). Session: **yes** (`session-test` S12) |
+| T0-31 | Sun Store | E-CI, E-VMW | Unit: flatpak output parsers (tables, permissions, app id check); AppStream catalogue reader (plain and gzip); the store against a fake `flatpak` (exact command lines, consent, offline with and without an earlier catalogue, install, remove, update, permissions, invalid ids never reach flatpak, missing flatpak); the view with a fake store (consent page, sections, list, app page, accessible names); the real window shows the consent text and "Enable Flathub". Session: S13, and no Flatpak remote exists afterwards. Owner: enabling Flathub and installing an app with network | Unit: **yes** (`packages`). Session: **yes** (`session-test` S13) |
+| T0-32 | Star OS packages in the image | E-CI | `staros-files` and `staros-sunstore` installed from the build-time repository; desktop entries valid; `flathub.flatpakrepo` shipped by `staros-sunstore`; no Flatpak remote in `/etc/flatpak/remotes.d` or `/usr/share/flatpak/remotes.d` and none configured; no `[staros]` in the image's pacman configuration; `cow_spacesize=50%` on every generated boot entry and on the booted kernel command line (S1) | **yes** (`build` policy check, `session-test` S1) |
+| T0-33 | Frosted glass theme | E-CI, E-VMW | Unit: theme contrast on the worst-case glass (text 9.43:1, focus ring 5.79:1 over the lightest wallpaper colour), the opaque fallback under the software scene graph, wallpaper offsets of taskbar and launcher glass, every icon loads; artwork licence, SVG subset and size limits (`check_shell_sources.py`). Session: the screen dump edge (informational). Owner: glass looks frosted with 3D on, opaque and readable with 3D off | Unit: **yes** (`shell-checks`, `lint`). Session: informational |
+| T0-34 | Launcher catalogue | E-CI | The launcher lists Files, Konsole, Sun Store and System Settings with their Star OS icons (unit); "fil" and "sun" launch Files and Sun Store (S12, S13); Orca's debug log names the first tile "Files" (S10, informational) | **yes** |
+
+## Manual procedure: VMware Workstation, M0.3 (T0-30..T0-34)
+
+Use the ISO of a green CI run and record that run's link in the log. The VM
+needs network access (NAT is enough) for the Sun Store steps, and at least
+4 GB RAM; Flatpak apps are stored in RAM on the live medium.
+
+1. Boot as in the M0.2 procedure. Expected: the taskbar and launcher are
+   frosted glass over a dark blue-violet wallpaper with stars. With
+   **Accelerate 3D graphics** off the glass is an opaque dark blue; text and
+   the amber focus ring must stay readable either way (T0-33).
+2. Open the launcher. Expected tiles, in this order: Files, Konsole, Sun
+   Store, System Settings, each with its own icon (T0-34).
+3. Files (T0-30): open it from the launcher. Check Places (Home and the
+   folders that exist, Trash, Computer). In Home: Ctrl+Shift+N creates a
+   folder; F2 renames it; Ctrl+C then Ctrl+V copies it; Delete moves the copy
+   to the Trash; in Trash, Restore brings it back; Shift+Delete asks before
+   deleting permanently (Cancel is focused); Ctrl+H shows hidden files;
+   Ctrl+L, type `/etc`, Return. Open a text file with Return. Note any step
+   without a visible focus ring.
+4. Sun Store (T0-31): open it. Expected: "Sun Store installs apps from
+   Flathub, a community app store. Star OS does not review these apps." with
+   "Enable Flathub" and "Not now". Choose "Not now": Sun Store closes. Open
+   it again and choose "Enable Flathub"; the app list loads (this downloads
+   Flathub's catalogue, tens of MB). Search for a small app, open its page,
+   read the permissions, Install, then Open, then Remove. Disconnect the
+   network and press F5: expected "Can't reach Flathub. Check your network
+   connection."
+5. In Konsole: `flatpak remotes --user` shows `flathub` only after step 4;
+   `flatpak remotes --system` shows nothing; `cat /proc/cmdline` contains
+   `cow_spacesize=50%`.
+6. With Orca on (Meta+Alt+S), repeat steps 3 and 4 by keyboard and note what
+   is spoken for the lists, the tabs ("Store sections") and the buttons.
 
 ## Manual procedure: VMware Workstation, M0.2 (T0-20..T0-25)
 

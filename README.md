@@ -15,9 +15,17 @@ What has been tested:
   UEFI (OVMF) and with BIOS (SeaBIOS).
 - **Boots in VMware Workstation:** reported working by the project owner on
   2026-10-19 (manual test T0-10).
+- **Star OS shell prototype in QEMU (CI, milestone M0.2):** the live ISO
+  starts a Wayland session on KWin with the Star OS taskbar and launcher;
+  keyboard-only launching and window switching were checked with real key
+  presses against KWin's own window list and the accessibility tree (CI run 12,
+  2026-10-21).
 
 What has **not** been tested: any real hardware, any installation (there is no
-installer yet), and any graphical session (there is none yet). This README claims a capability only once a recorded test shows it.
+installer yet), the graphical session in VMware, and the M0.3 work in progress
+(frosted glass theme, the Files file manager and the Sun Store app store; see
+the phase plan). This README claims a capability only once a recorded test
+shows it.
 Prototype ISOs are unsigned test artifacts.
 
 What exists today:
@@ -25,7 +33,7 @@ What exists today:
 | Area | Document | State |
 | --- | --- | --- |
 | Build environment inspection | [docs/development/environment-report-2026-10-19.md](docs/development/environment-report-2026-10-19.md) | Done |
-| Phase 0 plan and first milestone | [docs/development/phase-0-plan.md](docs/development/phase-0-plan.md) | M0.1 complete; M0.2 (shell prototype) in progress |
+| Phase 0 plan and milestones | [docs/development/phase-0-plan.md](docs/development/phase-0-plan.md) | M0.1 complete; M0.2 (shell prototype) green in CI, VMware run pending; M0.3 (glass, Files, Sun Store) in progress |
 | Building and boot-testing the ISO | [docs/development/building.md](docs/development/building.md) | Draft |
 | Architecture decision records | [docs/decisions/](docs/decisions/README.md) | Mostly accepted; ADR-0006 deferred to Phase 2 |
 | Test plan | [docs/development/test-plan.md](docs/development/test-plan.md) | Draft |
@@ -36,7 +44,7 @@ What exists today:
 ## Licensing
 
 Original Star OS code is licensed under GPL-3.0-or-later, and documentation
-under CC-BY-SA-4.0. See [LICENSES.md](LICENSES.md) and
+and original artwork under CC-BY-SA-4.0. See [LICENSES.md](LICENSES.md) and
 [ADR-0007](docs/decisions/0007-licensing.md). Third-party software in Star OS
 images keeps its own licenses.
 

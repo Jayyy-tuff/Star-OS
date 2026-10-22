@@ -50,6 +50,11 @@ every new privileged component.
 | 9 | Secrets in logs or diagnostic bundles | Redaction rules, opt-in diagnostics with a preview of contents, secrets only in system credential stores | 1+ |
 | 10 | Theme/preset import runs code | Presets are data only, validated against a schema; never executed | 5 |
 | 11 | Lost device | Full-disk encryption recommended at install | 2 |
+| 12 | A Flathub app is malicious or vulnerable | Sun Store adds Flathub only after the person reads "Star OS does not review these apps" and chooses "Enable Flathub"; apps install per user (no root, no Polkit); each app's permissions are listed before install; Flatpak's sandbox; no system-wide remote in the image (ADR-0010) | 0 (M0.3) |
+| 13 | Tampered Flatpak downloads or remote definition | flatpak verifies Flathub's signed commits with the key in `flathub.flatpakrepo`; that file's sha256 is pinned in the PKGBUILD; HTTPS | 0 (M0.3) |
+| 14 | Argument or path injection into `flatpak` | Argument lists through `QProcess`, never a shell; app ids must match a strict reverse-DNS pattern (no leading `-`, no `/`, no spaces) or nothing runs; standard input closed | 0 (M0.3) |
+| 15 | The file manager destroys data or runs untrusted files | Delete moves to the Trash; permanent deletion and emptying the Trash ask first, with Cancel focused; Files never starts programs (executables are refused, scripts and desktop entries open as text); it runs as the user only | 0 (M0.3) |
+| 16 | Unsigned Star OS packages | The `[staros]` repository is a local directory used during one CI build only; the image's pacman configuration does not list it (image policy); a signed repository is Phase 4 (threat #1) | 0 (M0.3) |
 
 ## Accepted risks in Phase 0
 
@@ -86,6 +91,13 @@ every new privileged component.
   (`scripts/ci/forbidden-env.txt`). The taskbar gets the window list only
   through plasmashell's packaged grant. Checked in the repository, in the
   built image, and in the running session's KWin and plasmashell environment.
+- **Flathub apps are not reviewed by Star OS** (M0.3, ADR-0010). Sun Store
+  says so before Flathub is added. Flatpak's static permissions are not a
+  complete boundary: an app with X11 access can read other X11 windows'
+  input, and one with home or host file access can read and change the
+  person's files. Sun Store lists such permissions in plain words; it does not
+  block them. On the live medium installed apps live in RAM and disappear at
+  shutdown.
 - **No Secure Boot.** Users must disable Secure Boot to boot prototypes
   (ADR-0006).
 - **Prototype ISOs are unsigned.** CI artifacts are for testing only and must

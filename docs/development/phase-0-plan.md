@@ -11,14 +11,15 @@ security uncertainties, and record human approval of the architecture.
 | Repository initialized | this repo | Done (documentation only) |
 | License and contribution policy | ADR-0007, LICENSES.md, CONTRIBUTING.md | License accepted (GPL-3.0-or-later; docs CC-BY-SA-4.0). Contribution policy: draft |
 | Initial threat model | docs/security/threat-model.md | Draft |
-| Architecture decision records | docs/decisions/ | 0001–0005 and 0007 accepted; 0006 deferred |
+| Architecture decision records | docs/decisions/ | 0001–0005, 0007–0010 accepted; 0006 deferred |
 | Supported hardware assumptions | below | Draft |
 | Package baseline policy | ADR-0002 | Accepted |
 | Wayland/compositor evaluation | ADR-0004 | KWin accepted; shell hosting decided by M0.2 |
 | Installer framework evaluation | ADR-0005 | Calamares accepted |
 | Btrfs snapshot and recovery prototype plan | ADR-0006 | Deferred to Phase 2 with plan |
 | Build environment setup | ADR-0003 + milestone M0.1 | **M0.1 complete** (CI build, QEMU boots, VMware boot) |
-| Qt/QML shell prototype | milestone M0.2 | In progress |
+| Qt/QML shell prototype | milestone M0.2 | CI green (run 12); owner's VMware run pending |
+| Glass theme, Files, Sun Store | milestone M0.3 | In progress |
 | Moon Browser integration checklist | — | Removed from the current scope at the owner's request (2026-10-19); the owner will add Moon Browser later. No other browser will be substituted without approval |
 
 ## Smallest useful deliverable: M0.1 — console ISO prototype
@@ -177,6 +178,31 @@ results):
 Still to do: keep S10 and S11 informational until they have three consecutive
 green runs; the owner's VMware run (procedure in `test-plan.md`, 3D on and
 off); then the ADR-0004 A/B decision with the CI and VMware numbers.
+
+## M0.3 — frosted glass, Files and Sun Store (in progress)
+
+Requested by the owner on 2026-10-22: a frosted glass theme, original icons
+for the terminal, settings and Moon Browser (icon only; no browser is added),
+a file manager, and a Flatpak app store named Sun Store. Owner decisions the
+same day: C++/Qt Quick applications built as pacman packages (ADR-0009),
+per-user Flatpak with Flathub added after consent (ADR-0010), original SVG
+artwork drawn for Star OS, artwork under CC-BY-SA-4.0 (ADR-0007 amendment).
+The design contract is `docs/architecture/m03-glass-files-store-design.md`;
+the tests are T0-30..T0-34 in `test-plan.md`.
+
+What exists in the repository:
+
+- `StarOS.Shell`: frosted glass surfaces (the Star OS wallpaper, blurred and
+  tinted; opaque without a GPU or with reduced transparency), five original
+  icons (terminal, settings, files, Sun Store, Moon Browser) and the
+  wallpaper, all SVG and under 8 KB (icons) / 64 KB (wallpaper).
+- `apps/files/` and `apps/sunstore/` with C++ and QML tests, packaged from
+  `distro/packages/`; `scripts/build-packages.sh`; the ISO build's local
+  repository and the `cow_spacesize=50%` boot parameter; image policy and
+  session test additions (S12, S13).
+
+No CI result exists for M0.3 yet. The status below is filled in from CI runs
+only.
 
 ## Supported hardware assumptions (Phase 0)
 

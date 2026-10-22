@@ -2,6 +2,14 @@
 
 Status: accepted with [ADR-0008](../decisions/0008-m02-shell-hosting-and-live-session.md) (2026-10-20).
 
+M0.3 update (2026-10-22): the frosted glass theme replaces the flat reserved
+taskbar and desktop colours. Where this document relies on them (Theme's
+reserved colours, the screen dump's taskbar band and desktop share), the
+[M0.3 design contract](m03-glass-files-store-design.md) sections 1 and 5
+apply instead: the screen analysis reports the glass taskbar's top edge, and
+AT-SPI geometry remains the authority. The launcher catalogue now lists Files
+and Sun Store instead of KMenuEdit.
+
 This is the engineering specification behind ADR-0008. It was produced by three
 independent designs, two independent reviews and a synthesis, checked against
 upstream source at the baseline tags (KWin/Plasma 6.7.5, Qt 6.12.0, KF 6.31.0,
