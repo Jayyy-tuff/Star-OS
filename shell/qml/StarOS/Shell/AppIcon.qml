@@ -1,14 +1,21 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 import QtQuick
 
-// An application's icon: the Star OS artwork for appId (Icons), or, when there
-// is none or it cannot be loaded, a monogram of the name. Decorative: the
-// control that shows it carries the accessible name.
+// An application's icon: the Star OS artwork for appId (Icons); otherwise the
+// host's fallback component showing iconData (the Plasma adapters pass a
+// Kirigami.Icon and the app's theme icon); otherwise a monogram of the name.
+// Decorative: the control that shows it carries the accessible name.
 Item {
     id: root
 
     property string appId: ""
     property string name: ""
+    // The host's icon for the app, given to the fallback's iconData property.
+    property var iconData: undefined
+    // A Component whose root item has a property iconData; null for none.
+    property Component fallback: null
+
+    readonly property bool usesFallback: fallbackLoader.status === Loader.Ready
 
     implicitWidth: Theme.tileIconSize
     implicitHeight: Theme.tileIconSize
@@ -27,12 +34,23 @@ Item {
         Accessible.ignored: true
     }
 
+    Loader {
+        id: fallbackLoader
+        objectName: "fallback"
+        anchors.fill: parent
+        active: artwork.status !== Image.Ready && root.fallback !== null
+            && root.iconData !== undefined && root.iconData !== null
+        sourceComponent: root.fallback
+        onLoaded: item.iconData = Qt.binding(() => root.iconData)
+        Accessible.ignored: true
+    }
+
     // Inset to the size of the artwork's tile (216 of 256 units).
     Rectangle {
         objectName: "monogram"
         anchors.fill: parent
         anchors.margins: Math.round(root.width * 0.08)
-        visible: artwork.status !== Image.Ready
+        visible: artwork.status !== Image.Ready && !root.usesFallback
         radius: Math.round(width / 4)
         color: Theme.monogram
 

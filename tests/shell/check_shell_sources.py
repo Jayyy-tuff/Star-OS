@@ -10,7 +10,7 @@
   QtQuick.Window, and its qmldir lists exactly the module's QML files.
 - SVG artwork is well-formed, starts with a CC-BY-SA-4.0 SPDX comment, keeps
   to what Qt's SVG renderer draws (no filters, masks, clip paths, patterns,
-  images, text or CSS), and stays under its size limit; the icons are the five
+  images, text or CSS), and stays under its size limit; the icons are the seven
   256x256 Star OS icons; every wallpaper colour lies between Theme.qml's
   wallpaperDarkest and wallpaperLightest, channel by channel, and both are used.
 
@@ -31,7 +31,8 @@ PACKAGE_KINDS = {"shells": "Plasma/Shell", "plasmoids": "Plasma/Applet"}
 SPDX = "SPDX-License-Identifier:"
 PRIVATE = "org.kde.plasma.private"
 ARTWORK_SPDX = re.compile(r"\A\s*<!--\s*SPDX-License-Identifier:\s*CC-BY-SA-4\.0\s*-->")
-ICONS = {"terminal.svg", "settings.svg", "files.svg", "sun-store.svg", "moon-browser.svg"}
+ICONS = {"terminal.svg", "settings.svg", "files.svg", "sun-store.svg", "moon-browser.svg",
+         "lens.svg", "storage.svg"}
 ICON_LIMIT = 8 * 1024
 WALLPAPER = os.path.join(MODULE, "wallpaper", "star-os-glass.svg")
 WALLPAPER_LIMIT = 64 * 1024

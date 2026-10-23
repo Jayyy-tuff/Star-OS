@@ -186,14 +186,14 @@ install_shell_files() {
     cp -a -- "$shell_src/plasma/plasmoids/." "$airootfs/usr/share/plasma/plasmoids/"
     find "$airootfs/usr/lib/qt6/qml/StarOS" "$airootfs/usr/share/plasma" \
         -name '*.license' -type f -delete
-    log "Installed Star OS shell files ($(find "$airootfs/usr/lib/qt6/qml/StarOS" \
+    log "Installed Star OS shell files ($(find "$airootfs/usr/lib/qt6/qml/StarOS/Shell" \
         "$airootfs/usr/share/plasma" -type f | wc -l) files)"
 }
 
 # A hash over the installed shell tree (paths and contents), for build records.
 shell_tree_hash() {
     local airootfs=$1
-    (cd -- "$airootfs" && find usr/lib/qt6/qml/StarOS usr/share/plasma/shells/org.staros.shell \
+    (cd -- "$airootfs" && find usr/lib/qt6/qml/StarOS/Shell usr/share/plasma/shells/org.staros.shell \
         usr/share/plasma/plasmoids/org.staros.taskbar usr/share/plasma/plasmoids/org.staros.desktop \
         -type f -print0 | LC_ALL=C sort -z | xargs -0 sha256sum) | sha256sum | cut -d' ' -f1
 }

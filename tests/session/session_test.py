@@ -22,6 +22,10 @@ Scenarios:
   S12 launch Files; its Places and Folder contents lists over AT-SPI
   S13 launch Sun Store; its first-run "Enable Flathub" button over AT-SPI
       (CI has no network; nothing is added or downloaded)
+  S14 quick answer: "12*3" shows "Answer: 36"; Return copies it
+  S15 sticky note: "note: hello star" puts a note on the desktop and in
+      ~/.local/share/staros/notes.json
+  S16 the taskbar's "System status" says the session is live (in memory)
   Informational: S11 scaling with kscreen-doctor (AT-SPI geometry and screen
   dumps at 150, 200 and 100 %), S10 Orca (Meta+Alt+S, then a debug Orca's
   speech output for the launcher).
@@ -62,12 +66,15 @@ SUNSTORE = "org.staros.sunstore"
 # The live medium's writable layer (M0.3, scripts/build-iso.sh).
 KERNEL_PARAM = "cow_spacesize=50%"
 
-QCODES = {" ": "spc", "\n": "ret", "-": "minus", ".": "dot", "/": "slash"}
+# Characters that need a different key or Shift (US layout).
+QCODES = {" ": ("spc",), "\n": ("ret",), "-": ("minus",), ".": ("dot",), "/": ("slash",),
+          "*": ("kp_multiply",), "+": ("kp_add",), ":": ("shift", "semicolon")}
 
 
 def qcode(ch):
+    """The QMP qcodes to press together for one character."""
     if ch.isalpha() or ch.isdigit():
-        return ch.lower()
+        return (ch.lower(),)
     return QCODES[ch]
 
 
@@ -152,7 +159,7 @@ class Session:
 
     def type_text(self, text):
         for ch in text:
-            self.keys(qcode(ch))
+            self.keys(*qcode(ch))
 
     def screenshot(self, label):
         self.shots += 1
@@ -404,6 +411,38 @@ def run_scenarios(s):
     s.check("S13", code == 0 and not out.strip(), f"no Flatpak remote was added: {out.strip()!r}")
     s.screenshot("S13-sunstore")
 
+    # S14: a quick answer in the launcher; Return copies it and closes.
+    s.keys("meta_l")
+    s.wait_focus("text", "Search applications")
+    s.type_text("12*3")
+    time.sleep(1)
+    tree = s.atspi("walk", "plasmashell", "20")
+    answers = find(tree, name="Answer: 36")
+    s.check("S14", bool(answers), f"the launcher shows 'Answer: 36': {named_objects(tree, 60)}")
+    s.keys("ret")
+    time.sleep(1)
+    s.check("S14", any("STAROS-SHELL answer=36" in line for line in s.journal_shell()),
+            "Return copied the answer (shell log 'answer=36')")
+
+    # S15: "note:" makes a sticky note on the desktop.
+    s.keys("meta_l")
+    s.wait_focus("text", "Search applications")
+    s.type_text("note: hello star")
+    s.keys("ret")
+    time.sleep(2)
+    code, out, _ = s.guest(["/usr/bin/cat", "/home/liveuser/.local/share/staros/notes.json"])
+    s.check("S15", code == 0 and "hello star" in out, f"notes.json has the note: {out.strip()[:300]!r}")
+    tree = s.atspi("walk", "plasmashell", "20")
+    notes = [n for n in find(tree, name="Sticky note") if n.get("description") == "hello star"]
+    s.check("S15", bool(notes), "the desktop shows a 'Sticky note' with the text over AT-SPI")
+    s.screenshot("S15-note")
+
+    # S16: the system meter says where changes are kept.
+    meters = find(tree, role=BUTTON, name="System status")
+    detail = meters[0].get("description", "") if meters else ""
+    s.check("S16", detail.startswith("Live session: changes are lost at shutdown."),
+            f"'System status' says: {detail!r}")
+
     # Informational until each has three consecutive green runs (design spec).
     for scenario in (scenario_scaling, scenario_orca):
         try:
@@ -488,7 +527,7 @@ def scenario_orca(s):
         time.sleep(2)
     code, out, _ = s.guest(["/usr/bin/grep", "-a", "SPEECH OUTPUT", log])
     spoken = [line.split("SPEECH OUTPUT:", 1)[-1].strip() for line in out.splitlines()]
-    heard = [n for n in ("Search applications", "Files", "Konsole") if any(n in x for x in spoken)]
+    heard = [n for n in ("Search applications", "Ark", "Files") if any(n in x for x in spoken)]
     s.record("S10", "INFO", f"names in Orca's speech output: {heard}; last lines: "
              + " | ".join(spoken[-12:]))
     s.guest(["/usr/bin/pkill", "-u", "liveuser", "-x", "orca"])

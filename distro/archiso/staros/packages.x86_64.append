@@ -31,3 +31,17 @@ wireplumber
 # staros-sunstore pulls flatpak.
 staros-files
 staros-sunstore
+# M0.4 (docs/architecture/m04-apps-lens-storage-design.md): the StarOS.System
+# QML module, and the preinstalled apps from the pinned snapshot. Firefox is
+# the browser until the owner adds Moon Browser.
+staros-system
+firefox
+vlc
+okular
+gwenview
+ark
+kwrite
+kcalc
+# Offline text recognition for Star Lens.
+tesseract
+tesseract-data-eng

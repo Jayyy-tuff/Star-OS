@@ -22,6 +22,16 @@ Item {
     }
 
     Component {
+        id: fallbackComponent
+
+        Rectangle {
+            objectName: "fallbackIcon"
+            property var iconData
+            color: "magenta"
+        }
+    }
+
+    Component {
         id: imageComponent
 
         Image {
@@ -37,9 +47,11 @@ Item {
 
         // One id per artwork file.
         readonly property var artworkIds: ["org.kde.konsole", "systemsettings", "org.staros.files",
-            "org.staros.sunstore", "moon-browser"]
+            "org.staros.sunstore", "moon-browser", "org.staros.lens", "org.staros.storage"]
 
         function init() {
+            icon.fallback = null;
+            icon.iconData = undefined;
             icon.appId = "";
             icon.name = "";
         }
@@ -55,6 +67,9 @@ Item {
                 {tag: "org.staros.files.desktop", id: "org.staros.files.desktop", file: "files.svg"},
                 {tag: "org.staros.sunstore", id: "org.staros.sunstore", file: "sun-store.svg"},
                 {tag: "org.staros.sunstore.desktop", id: "org.staros.sunstore.desktop", file: "sun-store.svg"},
+                {tag: "org.staros.lens.desktop", id: "org.staros.lens.desktop", file: "lens.svg"},
+                {tag: "org.staros.storage", id: "org.staros.storage", file: "storage.svg"},
+                {tag: "firefox.desktop (theme icon)", id: "firefox.desktop", file: ""},
                 {tag: "moon", id: "moon", file: "moon-browser.svg"},
                 {tag: "moon-browser", id: "moon-browser", file: "moon-browser.svg"},
                 {tag: "org.staros.moon", id: "org.staros.moon", file: "moon-browser.svg"},
@@ -138,6 +153,30 @@ Item {
             icon.appId = "org.kde.konsole.desktop";
             tryCompare(artwork, "status", Image.Ready, 5000);
             verify(artwork.visible && !monogram.visible);
+        }
+
+        // An app without Star OS artwork shows the host's fallback with its
+        // iconData; without iconData it keeps the monogram.
+        function test_fallback_component() {
+            icon.appId = "firefox.desktop";
+            icon.name = "Firefox";
+            icon.fallback = fallbackComponent;
+            icon.iconData = "firefox";
+            tryVerify(() => icon.usesFallback, 5000, "the fallback is loaded");
+            const item = findChild(icon, "fallbackIcon");
+            verify(item !== null);
+            compare(item.iconData, "firefox");
+            verify(!findChild(icon, "monogram").visible);
+            icon.iconData = undefined;
+            tryVerify(() => !icon.usesFallback, 5000, "no iconData, no fallback");
+            verify(findChild(icon, "monogram").visible);
+            // Star OS artwork wins over the fallback.
+            icon.iconData = "files";
+            icon.appId = "org.staros.files";
+            tryCompare(findChild(icon, "artwork"), "status", Image.Ready, 5000);
+            verify(!icon.usesFallback);
+            icon.fallback = null;
+            icon.iconData = undefined;
         }
 
         function test_decorative() {

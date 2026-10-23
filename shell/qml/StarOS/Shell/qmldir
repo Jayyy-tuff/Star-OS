@@ -13,3 +13,7 @@ TaskButton 1.0 TaskButton.qml
 Taskbar 1.0 Taskbar.qml
 LauncherTile 1.0 LauncherTile.qml
 Launcher 1.0 Launcher.qml
+SystemMeter 1.0 SystemMeter.qml
+StickyNote 1.0 StickyNote.qml
+NotesBoard 1.0 NotesBoard.qml
+QuickAnswers 1.0 quickanswers.js

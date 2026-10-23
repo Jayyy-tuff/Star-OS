@@ -42,8 +42,9 @@ check() {
 }
 
 # Shell file trees installed by build-iso.sh, relative to the root.
+# (StarOS/System comes from the staros-system package.)
 shell_paths=(
-    usr/lib/qt6/qml/StarOS
+    usr/lib/qt6/qml/StarOS/Shell
     usr/share/plasma/shells/org.staros.shell
     usr/share/plasma/plasmoids/org.staros.taskbar
     usr/share/plasma/plasmoids/org.staros.desktop
@@ -222,6 +223,29 @@ app_entries_valid() {
     done
 }
 
+# Desktop files of the launcher's catalogue (AppCatalogue.qml) that the
+# image must have, so a renamed desktop file is noticed.
+catalogue_apps=(
+    org.kde.konsole systemsettings org.staros.files org.staros.sunstore
+    firefox vlc org.kde.okular org.kde.gwenview org.kde.ark org.kde.kwrite org.kde.kcalc
+)
+
+catalogue_apps_present() {
+    local id similar missing=0
+    for id in "${catalogue_apps[@]}"; do
+        [[ -f $root/usr/share/applications/$id.desktop ]] && continue
+        similar=$(find "$root/usr/share/applications" -maxdepth 1 -iname "*${id##*.}*" -printf '%f ' 2>/dev/null)
+        printf '    missing /usr/share/applications/%s.desktop (similar: %s)\n' "$id" "${similar:-none}"
+        missing=1
+    done
+    ((missing == 0))
+}
+
+star_os_system_module() {
+    [[ -f $root/usr/lib/qt6/qml/StarOS/System/qmldir ]] \
+        && [[ $(pacman_root -Qqo "$root/usr/lib/qt6/qml/StarOS/System/qmldir" 2>/dev/null) == staros-system ]]
+}
+
 flathub_file_shipped() {
     local file="$root/usr/share/staros-sunstore/flathub.flatpakrepo"
     [[ -f $file ]] && grep -qx '\[Flatpak Repo\]' "$file" \
@@ -276,6 +300,8 @@ check "overlay and shell paths are unowned or package backup files" overlay_path
 check "staros-files and staros-sunstore are installed" star_os_apps_installed
 check "Files and Sun Store desktop entries pass desktop-file-validate" app_entries_valid
 check "staros-sunstore ships Flathub's remote file" flathub_file_shipped
+check "the launcher's catalogue apps have their desktop files" catalogue_apps_present
+check "StarOS.System is installed by staros-system" star_os_system_module
 check "no system-wide Flatpak remote" no_system_flatpak_remote
 check "the image's pacman configuration has no [staros] build repository" no_build_repository
 info_present

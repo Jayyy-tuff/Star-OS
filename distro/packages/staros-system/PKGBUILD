@@ -1,0 +1,44 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Star OS system QML module (M0.4): StarOS.System with the system status and
+# the sticky notes store, for the shell and the apps. Built in CI by
+# scripts/build-packages.sh from a tarball of the checked-out repository
+# (ADR-0009). The version is fixed and bumped in reviewed changes.
+
+pkgname=staros-system
+pkgver=0.4.0
+pkgrel=1
+pkgdesc='Star OS system status and notes QML module'
+arch=(x86_64)
+url='https://github.com/Jayyy-tuff/Star-OS'
+license=(GPL-3.0-or-later)
+# No split debug package; no LTO.
+options=(!debug !lto)
+depends=(
+  gcc-libs
+  glibc
+  qt6-base
+  qt6-declarative
+)
+makedepends=(
+  cmake
+  extra-cmake-modules
+  ninja
+)
+source=(star-os-src.tar.gz)
+sha256sums=('SKIP')
+
+build() {
+  cmake -B build -S star-os-src/apps/system -G Ninja \
+    -DCMAKE_INSTALL_PREFIX=/usr \
+    -DCMAKE_BUILD_TYPE=RelWithDebInfo \
+    -DBUILD_TESTING=ON
+  cmake --build build
+}
+
+check() {
+  QT_QPA_PLATFORM=offscreen ctest --test-dir build --output-on-failure
+}
+
+package() {
+  DESTDIR="$pkgdir" cmake --install build
+}

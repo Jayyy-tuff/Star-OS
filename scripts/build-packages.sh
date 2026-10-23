@@ -58,15 +58,32 @@ make_source_tarball() {
     log "Source tarball: $(du -h -- "$tarball" | cut -f1)"
 }
 
-# Installs the depends, makedepends and checkdepends of the PKGBUILD in DIR.
+# Installs the depends, makedepends and checkdepends of the PKGBUILD in DIR:
+# Star OS packages (staros-*) from OUT, built earlier in this run, and the
+# others from the pinned Arch repositories.
 install_dependencies() {
-    local dir=$1
-    local -a deps
+    local dir=$1 out=$2 dep
+    local -a deps repo_deps=() local_files=() found
     mapfile -t deps < <(as_builder env -C "$dir" makepkg --printsrcinfo \
         | awk -F ' = ' '$1 ~ /^\t(depends|makedepends|checkdepends)$/ { print $2 }' | sort -u)
     ((${#deps[@]} > 0)) || die "no dependencies found in $dir/PKGBUILD"
-    log "Installing ${#deps[@]} dependencies: ${deps[*]}"
-    pacman -S --noconfirm --needed --asdeps -- "${deps[@]}"
+    for dep in "${deps[@]}"; do
+        if [[ $dep == staros-* ]]; then
+            found=("$out/$dep"-[0-9]*.pkg.tar.zst)
+            [[ -f ${found[0]} ]] || die "$dep is needed but was not built before; check the build order"
+            local_files+=("${found[0]}")
+        else
+            repo_deps+=("$dep")
+        fi
+    done
+    if ((${#repo_deps[@]} > 0)); then
+        log "Installing ${#repo_deps[@]} dependencies: ${repo_deps[*]}"
+        pacman -S --noconfirm --needed --asdeps -- "${repo_deps[@]}"
+    fi
+    if ((${#local_files[@]} > 0)); then
+        log "Installing Star OS packages built earlier: ${local_files[*]##*/}"
+        pacman -U --noconfirm --asdeps -- "${local_files[@]}"
+    fi
 }
 
 # After a failed makepkg: the checksums of the downloaded sources, so that a
@@ -90,7 +107,7 @@ build_package() {
     install -d -o "$builder" -- "$dir"
     install -m 644 -o "$builder" -- "$packages_dir/$name/PKGBUILD" "$dir/PKGBUILD"
     install -m 644 -o "$builder" -- "$tarball" "$dir/star-os-src.tar.gz"
-    install_dependencies "$dir"
+    install_dependencies "$dir" "$out"
     log "Building and testing $name"
     if ! as_builder env -C "$dir" makepkg --nodeps --cleanbuild --check --noconfirm; then
         show_sources "$dir"
@@ -106,8 +123,11 @@ main() {
     check_host
     local out=$1 tarball pkgbuild file
     local -a names=()
+    # staros-system first: the other packages use its QML module.
+    [[ -f $packages_dir/staros-system/PKGBUILD ]] && names+=(staros-system)
     for pkgbuild in "$packages_dir"/*/PKGBUILD; do
-        [[ -f $pkgbuild ]] && names+=("$(basename -- "$(dirname -- "$pkgbuild")")")
+        file=$(basename -- "$(dirname -- "$pkgbuild")")
+        [[ -f $pkgbuild && $file != staros-system ]] && names+=("$file")
     done
     ((${#names[@]} > 0)) || die "no PKGBUILD found under $packages_dir"
 

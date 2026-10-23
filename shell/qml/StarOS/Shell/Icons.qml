@@ -24,6 +24,10 @@ QtObject {
             return icons.directory + "files.svg";
         case "org.staros.sunstore":
             return icons.directory + "sun-store.svg";
+        case "org.staros.lens":
+            return icons.directory + "lens.svg";
+        case "org.staros.storage":
+            return icons.directory + "storage.svg";
         // Prepared for the owner's Moon Browser; no browser ships yet.
         case "moon":
         case "moon-browser":

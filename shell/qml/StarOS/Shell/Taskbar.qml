@@ -3,7 +3,8 @@ pragma ComponentBehavior: Bound
 
 import QtQuick
 
-// The Star OS taskbar: Applications button, open windows, Leave button.
+// The Star OS taskbar: Applications button, open windows, the system meter
+// (when the host gives a status) and the Leave button.
 // It only emits requests; the host (Plasma adapter, or a test) acts on them.
 // Escape is deliberately not handled, so the host panel can restore focus to
 // the previous window.
@@ -18,10 +19,17 @@ FocusScope {
     // full-width taskbar at the bottom edge.
     property point glassOrigin: Qt.point(0, Screen.height - root.height)
     property size glassScreenSize: Qt.size(Screen.width, Screen.height)
+    // Shows an app's own icon when Star OS has no artwork for it (AppIcon).
+    property Component iconFallback: null
+    // Storage, memory and battery for the SystemMeter; null hides the meter.
+    property var systemStatus: null
+
+    readonly property Item afterWindows: systemMeter.visible ? systemMeter : leaveButton
 
     signal launcherRequested()
     signal activateRequested(int row)
     signal leaveRequested()
+    signal systemStatusRequested()
 
     implicitHeight: Theme.taskbarHeight
     implicitWidth: 3 * Theme.startButtonWidth
@@ -53,7 +61,7 @@ FocusScope {
         focus: true
         text: qsTr("Applications")
         description: qsTr("Open the application launcher")
-        KeyNavigation.right: openWindows.count > 0 ? openWindows : leaveButton
+        KeyNavigation.right: openWindows.count > 0 ? openWindows : root.afterWindows
         onClicked: root.launcherRequested()
     }
 
@@ -61,7 +69,7 @@ FocusScope {
         id: openWindows
         objectName: "openWindows"
         anchors.left: applicationsButton.right
-        anchors.right: leaveButton.left
+        anchors.right: systemMeter.visible ? systemMeter.left : leaveButton.left
         anchors.leftMargin: Theme.spacing
         anchors.rightMargin: Theme.spacing
         anchors.top: parent.top
@@ -79,7 +87,7 @@ FocusScope {
         // Arrow keys move within the list first; at either end they move on.
         KeyNavigation.priority: KeyNavigation.AfterItem
         KeyNavigation.left: applicationsButton
-        KeyNavigation.right: leaveButton
+        KeyNavigation.right: root.afterWindows
 
         Accessible.role: Accessible.List
         Accessible.name: qsTr("Open windows")
@@ -103,6 +111,8 @@ FocusScope {
             title: task.model.display ?? ""
             appName: task.model.AppName ?? ""
             appId: task.model.AppId ?? ""
+            iconData: task.model.decoration
+            iconFallback: root.iconFallback
             isActive: task.model.IsActive === true
             onClicked: {
                 openWindows.currentIndex = task.index;
@@ -117,6 +127,21 @@ FocusScope {
         }
     }
 
+    SystemMeter {
+        id: systemMeter
+        objectName: "systemMeter"
+        anchors.right: leaveButton.left
+        anchors.rightMargin: Theme.spacing / 2
+        anchors.verticalCenter: parent.verticalCenter
+        width: Math.min(implicitWidth, 10 * Theme.gridUnit)
+        height: root.height - Theme.spacing
+        visible: root.systemStatus !== null
+        status: root.systemStatus
+        KeyNavigation.left: openWindows.count > 0 ? openWindows : applicationsButton
+        KeyNavigation.right: leaveButton
+        onClicked: root.systemStatusRequested()
+    }
+
     ShellButton {
         id: leaveButton
         objectName: "leaveButton"
@@ -127,7 +152,8 @@ FocusScope {
         height: root.height - Theme.spacing
         text: qsTr("Leave")
         description: qsTr("Log out, restart or shut down")
-        KeyNavigation.left: openWindows.count > 0 ? openWindows : applicationsButton
+        KeyNavigation.left: systemMeter.visible ? systemMeter
+                           : openWindows.count > 0 ? openWindows : applicationsButton
         onClicked: root.leaveRequested()
     }
 }

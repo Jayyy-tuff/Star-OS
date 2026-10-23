@@ -10,6 +10,8 @@ T.AbstractButton {
     property string title: ""
     property string appName: ""
     property string appId: ""
+    property var iconData: undefined
+    property Component iconFallback: null
     property bool isActive: false
 
     text: control.title !== "" ? control.title : control.appName
@@ -56,6 +58,8 @@ T.AbstractButton {
             width: Theme.taskIconSize
             height: Theme.taskIconSize
             appId: control.appId
+            iconData: control.iconData
+            fallback: control.iconFallback
             name: control.appName !== "" ? control.appName : control.title
         }
 

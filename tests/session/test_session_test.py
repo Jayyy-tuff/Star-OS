@@ -72,7 +72,10 @@ class HelperTest(unittest.TestCase):
         self.assertEqual(len(json.loads(session_test.named_objects(TREE, limit=2))), 2)
 
     def test_qcode(self):
-        self.assertEqual([session_test.qcode(c) for c in "Kon 1"], ["k", "o", "n", "spc", "1"])
+        self.assertEqual([session_test.qcode(c) for c in "Kon 1"],
+                         [("k",), ("o",), ("n",), ("spc",), ("1",)])
+        self.assertEqual(session_test.qcode("*"), ("kp_multiply",))
+        self.assertEqual(session_test.qcode(":"), ("shift", "semicolon"))
         with self.assertRaises(KeyError):
             session_test.qcode("@")
 

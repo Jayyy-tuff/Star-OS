@@ -10,6 +10,8 @@ T.AbstractButton {
     property string appName: ""
     property string genericName: ""
     property string appId: ""
+    property var iconData: undefined
+    property Component iconFallback: null
 
     text: control.appName
     implicitWidth: Theme.tileWidth
@@ -45,6 +47,8 @@ T.AbstractButton {
             height: Theme.tileIconSize
             appId: control.appId
             name: control.appName
+            iconData: control.iconData
+            fallback: control.iconFallback
         }
 
         Text {

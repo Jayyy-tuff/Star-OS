@@ -3,6 +3,7 @@ import QtQuick
 import QtQuick.Window
 import org.kde.layershell as LayerShell
 import StarOS.Shell
+import StarOS.System
 
 // Full-screen launcher surface: a layer-shell Overlay window hosting the
 // Plasma-free Launcher. KWin creates a new surface on every show and activates
@@ -11,6 +12,7 @@ Window {
     id: win
 
     required property Item catalogue
+    property Component iconFallback: null
 
     // Set once the surface was activated, so that only a later deactivation
     // (Alt+Tab, a click elsewhere) hides it.
@@ -67,6 +69,17 @@ Window {
         anchors.fill: parent
         focus: true
         catalogue: win.catalogue
+        iconFallback: win.iconFallback
         onCloseRequested: win.hideLauncher()
+        onAnswerCopied: text => console.info("STAROS-SHELL answer=" + text)
+        // Notes typed as "note: ..." go to the desktop's notes, cascading.
+        onNoteRequested: text => {
+            const offset = (NotesStore.count % 8) * 0.04;
+            const noteId = NotesStore.add(text);
+            if (noteId !== "") {
+                NotesStore.move(noteId, 0.04 + offset, 0.06 + offset);
+            }
+            console.info("STAROS-SHELL note=" + (noteId !== "" ? "added" : "full"));
+        }
     }
 }

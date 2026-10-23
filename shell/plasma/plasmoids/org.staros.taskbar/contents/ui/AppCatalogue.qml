@@ -20,11 +20,21 @@ Item {
     // KDE applications that the iteration-0 probe found installed and visible
     // at the pinned snapshot, then the Star OS applications (M0.3 packages).
     // Tests never assume their order or number.
+    // M0.4 adds Star Lens, Star Storage and the preinstalled apps.
     readonly property list<string> desktopIds: [
         "org.kde.konsole.desktop",
         "systemsettings.desktop",
         "org.staros.files.desktop",
-        "org.staros.sunstore.desktop"
+        "org.staros.sunstore.desktop",
+        "org.staros.lens.desktop",
+        "org.staros.storage.desktop",
+        "firefox.desktop",
+        "vlc.desktop",
+        "org.kde.okular.desktop",
+        "org.kde.gwenview.desktop",
+        "org.kde.ark.desktop",
+        "org.kde.kwrite.desktop",
+        "org.kde.kcalc.desktop"
     ]
 
     visible: false
@@ -59,6 +69,22 @@ Item {
         filterCaseSensitivity: Qt.CaseInsensitive
         sortRoleName: "AppName"
         sortCaseSensitivity: Qt.CaseInsensitive
+    }
+
+    // Launches a catalogue app by desktop id (with or without ".desktop").
+    function launchDesktopId(desktopId) {
+        const wanted = String(desktopId).replace(/\.desktop$/, "");
+        for (let row = 0; row < launcherRows.count; ++row) {
+            const source = launcherRows.mapToSource(launcherRows.index(row, 0));
+            const appId = String(launchers.data(source, TaskManager.AbstractTasksModel.AppId) ?? "");
+            if (appId.replace(/\.desktop$/, "") === wanted) {
+                console.info("STAROS-SHELL launch=" + appId);
+                launchers.requestNewInstance(source);
+                return true;
+            }
+        }
+        console.warn("STAROS-SHELL not in the catalogue: " + desktopId);
+        return false;
     }
 
     function launch(row) {

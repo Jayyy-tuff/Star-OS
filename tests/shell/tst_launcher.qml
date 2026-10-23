@@ -29,6 +29,24 @@ Item {
         signalName: "closeRequested"
     }
 
+    SignalSpy {
+        id: answerSpy
+        target: launcher
+        signalName: "answerCopied"
+    }
+
+    SignalSpy {
+        id: noteSpy
+        target: launcher
+        signalName: "noteRequested"
+    }
+
+    // Reads the clipboard back.
+    TextInput {
+        id: pasteTarget
+        visible: false
+    }
+
     TestCase {
         id: testCase
         name: "Launcher"
@@ -58,6 +76,8 @@ Item {
             fakeCatalogue.launched = [];
             fakeCatalogue.launchResult = true;
             closeSpy.clear();
+            answerSpy.clear();
+            noteSpy.clear();
             launcher.reset();
             tryVerify(() => searchField.activeFocus, 5000, "search field has focus");
         }
@@ -277,6 +297,58 @@ Item {
             compare(grid.count, 4);
             compare(grid.currentIndex, 0);
             verify(searchField.activeFocus);
+        }
+
+        // Sums get an answer card; Return copies the answer and closes.
+        function test_quick_answer() {
+            const card = findChild(launcher, "answerCard");
+            const label = findChild(launcher, "answerLabel");
+            verify(!card.visible);
+            type("12*3");
+            verify(card.visible);
+            compare(label.text, "= 36");
+            compare(label.Accessible.name, "Answer: 36");
+            compare(searchField.Accessible.description, "Answer: 36. Press Return to copy it.");
+            keyClick(Qt.Key_Return);
+            compare(answerSpy.count, 1);
+            compare(answerSpy.signalArguments[0][0], "36");
+            compare(closeSpy.count, 1);
+            compare(fakeCatalogue.launched, []);
+            pasteTarget.text = "";
+            pasteTarget.paste();
+            compare(pasteTarget.text, "36");
+        }
+
+        function test_unit_conversion_answer() {
+            type("5 km in miles");
+            compare(findChild(launcher, "answerLabel").text, "= 3.106855961 mi");
+        }
+
+        // Text without an answer still launches the first app.
+        function test_no_answer_launches() {
+            type("fil");
+            verify(!findChild(launcher, "answerCard").visible);
+            keyClick(Qt.Key_Return);
+            compare(fakeCatalogue.launched, ["Files"]);
+            compare(answerSpy.count, 0);
+        }
+
+        // "note:" makes a sticky note on Return.
+        function test_note_prefix() {
+            const label = findChild(launcher, "answerLabel");
+            type("note:");
+            verify(findChild(launcher, "answerCard").visible);
+            compare(label.text, "Type the note after “note:”");
+            keyClick(Qt.Key_Return);
+            compare(noteSpy.count, 0);
+            compare(closeSpy.count, 0);
+            type(" buy milk");
+            compare(label.text, "New sticky note: buy milk");
+            keyClick(Qt.Key_Return);
+            compare(noteSpy.count, 1);
+            compare(noteSpy.signalArguments[0][0], "buy milk");
+            compare(closeSpy.count, 1);
+            compare(fakeCatalogue.launched, []);
         }
 
         function test_focus_ring_on_search_field() {
