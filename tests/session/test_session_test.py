@@ -40,6 +40,19 @@ class HelperTest(unittest.TestCase):
                          "System Settings")
         self.assertEqual(session_test.find(TREE, role="dialog"), [])
 
+    def test_find_showing(self):
+        tree = {"role": "panel", "name": "Star Lens", "states": ["showing", "visible"], "children": [
+            {"role": "panel", "name": "Results", "states": [], "children": []},
+            {"role": "label", "name": "Select an area", "states": ["showing", "visible"],
+             "children": []},
+        ]}
+        self.assertEqual(len(session_test.find(tree, name="Results")), 1)
+        self.assertEqual(session_test.find(tree, name="Results", showing=True), [])
+        self.assertEqual(len(session_test.find(tree, name="Select an area", showing=True)), 1)
+        self.assertEqual(session_test.find(TREE, showing=True), [], "no states, not showing")
+        self.assertEqual(json.loads(session_test.showing_objects(tree)),
+                         [["panel", "Star Lens"], ["label", "Select an area"]])
+
     def test_is_active(self):
         self.assertTrue(session_test.is_active({"active": "org.kde.konsole"}, "konsole"))
         self.assertFalse(session_test.is_active({"active": None}, "konsole"))

@@ -1,10 +1,12 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 #
-# Milestones M0.1 to M0.3: lint -> build and test the Star OS packages (Files,
-# Sun Store) -> build the live ISO in a pinned Arch container with them -> boot
-# it in QEMU (UEFI and BIOS) into the Star OS prototype session, run the
-# session test, measure the idle session three times, and compare its packages
-# with the baseline. The Star OS shell's QML unit tests run in parallel.
+# Milestones M0.1 to M0.4: lint -> build and test the Star OS packages
+# (StarOS.System, Files, Sun Store, Star Lens, Star Storage) -> build the live
+# ISO in a pinned Arch container with them -> boot it in QEMU (UEFI and BIOS)
+# into the Star OS prototype session, run the session test and the three-boot
+# Star Storage test, measure the idle session three times, and compare its
+# packages with the baseline. The Star OS shell's QML unit tests run in
+# parallel.
 # Test IDs refer to docs/development/test-plan.md.
 
 name: ISO

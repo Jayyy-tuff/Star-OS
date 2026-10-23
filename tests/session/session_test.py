@@ -296,16 +296,21 @@ def is_active(report, app):
 BUTTON = ("push button", "button")
 
 
-def find(node, role=None, name=None, description=None):
-    """All nodes of an AT-SPI tree matching the given fields (role: str or tuple)."""
+def find(node, role=None, name=None, description=None, showing=False):
+    """All nodes of an AT-SPI tree matching the given fields (role: str or tuple).
+
+    The tree also holds hidden objects (Qt Quick items with visible: false);
+    showing=True keeps only those on screen.
+    """
     roles = (role,) if isinstance(role, str) else role
     found = []
     if ((roles is None or node.get("role") in roles)
             and (name is None or node.get("name") == name)
-            and (description is None or node.get("description") == description)):
+            and (description is None or node.get("description") == description)
+            and (not showing or "showing" in node.get("states", []))):
         found.append(node)
     for child in node.get("children", []):
-        found.extend(find(child, role, name, description))
+        found.extend(find(child, role, name, description, showing))
     return found
 
 
@@ -411,12 +416,14 @@ def run_scenarios(s):
     launch(s, "fil")
     report = s.wait_oracle(lambda e: is_active(e, FILES), 45, f"active {FILES}")
     s.check("S12", True, f"Files launched and active per KWin: {json.dumps(report)}")
-    tree = s.atspi("walk", "staros-files", "30")
+    lists = ("Places", "Folder contents")
+    tree = wait_tree(s, "staros-files",
+                     lambda t: all(find(t, role="list", name=n, showing=True) for n in lists), 30)
     with open(os.path.join(s.log_dir, "atspi-files.json"), "w") as f:
         json.dump(tree, f, indent=1)
-    for name in ("Places", "Folder contents"):
-        s.check("S12", bool(find(tree, role="list", name=name)),
-                f"Files shows a list named {name!r}: {named_objects(tree)}")
+    for name in lists:
+        s.check("S12", bool(find(tree, role="list", name=name, showing=True)),
+                f"Files shows a list named {name!r}: {showing_objects(tree)}")
     s.screenshot("S12-files")
 
     # S13: Sun Store from the launcher. No user remote exists, so it asks
@@ -424,11 +431,12 @@ def run_scenarios(s):
     launch(s, "sun")
     report = s.wait_oracle(lambda e: is_active(e, SUNSTORE), 45, f"active {SUNSTORE}")
     s.check("S13", True, f"Sun Store launched and active per KWin: {json.dumps(report)}")
-    tree = s.atspi("walk", "staros-sunstore", "30")
+    tree = wait_tree(s, "staros-sunstore",
+                     lambda t: find(t, role=BUTTON, name="Enable Flathub", showing=True), 30)
     with open(os.path.join(s.log_dir, "atspi-sunstore.json"), "w") as f:
         json.dump(tree, f, indent=1)
-    s.check("S13", bool(find(tree, role=BUTTON, name="Enable Flathub")),
-            f"Sun Store shows an 'Enable Flathub' button: {named_objects(tree)}")
+    s.check("S13", bool(find(tree, role=BUTTON, name="Enable Flathub", showing=True)),
+            f"Sun Store shows an 'Enable Flathub' button: {showing_objects(tree)}")
     code, out, _ = s.as_user(["/usr/bin/flatpak", "remotes", "--user", "--columns=name"], timeout=30)
     s.check("S13", code == 0 and not out.strip(), f"no Flatpak remote was added: {out.strip()!r}")
     s.screenshot("S13-sunstore")
@@ -477,20 +485,26 @@ def run_scenarios(s):
         launch(s, "lens")
         report = s.wait_oracle(lambda e: is_active(e, LENS), 45, f"active {LENS}")
     s.check("S17", True, f"Star Lens active per KWin: {json.dumps(report)}")
-    tree = wait_tree(s, "staros-lens", lambda t: find(t, name="Select an area"), 30)
+    # The view keeps every panel in the tree and hides the ones for other
+    # states, so only objects that are showing count.
+    tree = wait_tree(s, "staros-lens", lambda t: find(t, name="Select an area", showing=True), 30)
     with open(os.path.join(s.log_dir, "atspi-lens.json"), "w") as f:
         json.dump(tree, f, indent=1)
-    s.check("S17", bool(find(tree, name="Select an area")),
-            f"Star Lens has a screenshot and asks to select an area: {named_objects(tree)}")
+    s.check("S17", bool(find(tree, name="Select an area", showing=True)),
+            f"Star Lens has a screenshot and asks to select an area: {showing_objects(tree)}")
     s.screenshot("S17-lens-select")
     s.keys("ctrl", "a")
     s.keys("ret")
-    tree = wait_tree(s, "staros-lens", lambda t: find(t, name="Results"), 120)
-    s.check("S17", bool(find(tree, name="Results")),
-            f"Ctrl+A and Return show the 'Results': {named_objects(tree)}")
-    texts = find(tree, name="Recognised text")
-    recognised = (texts[0].get("description") or "") if texts else ""
-    s.record("S17", "INFO", f"recognised text: {recognised[:200]!r}")
+    tree = wait_tree(s, "staros-lens", lambda t: find(t, name="Results", showing=True), 120)
+    with open(os.path.join(s.log_dir, "atspi-lens-results.json"), "w") as f:
+        json.dump(tree, f, indent=1)
+    s.check("S17", bool(find(tree, name="Results", showing=True)),
+            f"Ctrl+A and Return show the 'Results': {showing_objects(tree)}")
+    texts = find(tree, name="Recognised text", showing=True)
+    if texts:
+        s.record("S17", "INFO", f"recognised text: {texts[0].get('description', '')[:300]!r}")
+    else:
+        s.record("S17", "INFO", "no text recognised")
     s.screenshot("S17-lens-results")
     # Escape returns to selecting; a second Escape closes Star Lens, which
     # copied nothing and so has nothing to keep serving.
@@ -536,6 +550,12 @@ def wait_tree(s, app, predicate, seconds):
 def named_objects(tree, limit=40):
     """Roles and names of a tree's named objects, for evidence lines."""
     named = [(n.get("role"), n.get("name")) for n in find(tree) if n.get("name")]
+    return json.dumps(named[:limit])
+
+
+def showing_objects(tree, limit=40):
+    """Roles and names of a tree's named objects on screen, for evidence lines."""
+    named = [(n.get("role"), n.get("name")) for n in find(tree, showing=True) if n.get("name")]
     return json.dumps(named[:limit])
 
 

@@ -34,7 +34,7 @@ sys.path.insert(0, os.path.join(HERE, "..", "iso"))
 import boot_test  # noqa: E402
 import qga  # noqa: E402
 import session_test  # noqa: E402
-from session_test import BUTTON, CheckFailed, find, named_objects, wait_tree  # noqa: E402
+from session_test import BUTTON, CheckFailed, find, showing_objects, wait_tree  # noqa: E402
 
 HELPER = "/usr/lib/staros/staros-storage-helper"
 SCRATCH_BYTES = 10 * 1024 ** 3
@@ -82,12 +82,12 @@ def open_star_storage(s, name):
     session_test.launch(s, "star stor")
     report = s.wait_oracle(lambda e: session_test.is_active(e, STORAGE), 45, f"active {STORAGE}")
     s.check(name, True, f"Star Storage active per KWin: {json.dumps(report)}")
-    tree = wait_tree(s, "staros-storage", lambda t: find(t, role="list", name="Disks")
-                     and not find(t, name="Looking for disks…"), 60)
+    tree = wait_tree(s, "staros-storage", lambda t: find(t, role="list", name="Disks", showing=True)
+                     and not find(t, name="Looking for disks…", showing=True), 60)
     with open(os.path.join(s.log_dir, f"atspi-storage-{name}.json"), "w") as f:
         json.dump(tree, f, indent=1)
-    s.check(name, bool(find(tree, role="list", name="Disks")),
-            f"Star Storage shows its 'Disks' list: {named_objects(tree, 60)}")
+    s.check(name, bool(find(tree, role="list", name="Disks", showing=True)),
+            f"Star Storage shows its 'Disks' list: {showing_objects(tree, 60)}")
     return tree
 
 
@@ -129,11 +129,12 @@ def boot1(s, iso, vars_file, disk):
     s.type_text(scratch["name"])
     s.keys("ret")
     ready = f"Star Storage is ready on /dev/{scratch['name']}1."
-    tree = wait_tree(s, "staros-storage", lambda t: find(t, name=ready) or any(
-        str(n.get("name") or "").startswith("Star Storage was not set up.") for n in find(t)), 240)
+    tree = wait_tree(s, "staros-storage", lambda t: find(t, name=ready, showing=True) or any(
+        str(n.get("name") or "").startswith("Star Storage was not set up.")
+        for n in find(t, showing=True)), 240)
     s.screenshot("B1-storage-done")
-    s.check("B1", bool(find(tree, name=ready)),
-            f"Erase and set up says {ready!r}: {named_objects(tree, 60)}")
+    s.check("B1", bool(find(tree, name=ready, showing=True)),
+            f"Erase and set up says {ready!r}: {showing_objects(tree, 60)}")
     code, out, _ = s.guest(["/usr/bin/blkid", "-p", "-o", "export", f"/dev/{scratch['name']}1"])
     s.check("B1", code == 0 and "LABEL=STAROS_DATA" in out and "TYPE=ext4" in out,
             f"/dev/{scratch['name']}1 is ext4 labelled STAROS_DATA: {' '.join(out.split())}")
@@ -168,10 +169,12 @@ def boot2(s, iso, vars_file, disk, name):
             f"Shift+Tab reaches 'Always start with Star Storage': {json.dumps(focus)}")
     s.keys("spc")
     done = "Star OS now starts with Star Storage every time."
-    tree = wait_tree(s, "staros-storage", lambda t: find(t, name=done) or any(
-        str(n.get("name") or "").startswith("The start was not changed.") for n in find(t)), 60)
+    tree = wait_tree(s, "staros-storage", lambda t: find(t, name=done, showing=True) or any(
+        str(n.get("name") or "").startswith("The start was not changed.")
+        for n in find(t, showing=True)), 60)
     s.screenshot("B2-storage-always")
-    s.check("B2", bool(find(tree, name=done)), f"the app says {done!r}: {named_objects(tree, 60)}")
+    s.check("B2", bool(find(tree, name=done, showing=True)),
+            f"the app says {done!r}: {showing_objects(tree, 60)}")
     listed, scratch = scratch_disk(s, "B2")
     s.record("B2", "INFO", f"helper list: always={listed.get('always')} reason={scratch.get('reason')}")
     s.guest(["/usr/bin/systemctl", "poweroff"], wait=False)
