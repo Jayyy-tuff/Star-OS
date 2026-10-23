@@ -188,6 +188,11 @@ QRect LensBackend::toPixels(const QRectF &logical, const QImage &capture)
 void LensBackend::capture()
 {
     setState(QStringLiteral("capturing"));
+    // Without a bus, asyncCall() returns a call that never reports back.
+    if (!QDBusConnection::sessionBus().isConnected()) {
+        captureFailed(tr("there is no session bus to reach KWin."));
+        return;
+    }
     int fds[2];
     if (pipe2(fds, O_CLOEXEC) != 0) {
         captureFailed(tr("no pipe for the image."));

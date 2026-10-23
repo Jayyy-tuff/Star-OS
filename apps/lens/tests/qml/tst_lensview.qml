@@ -82,6 +82,9 @@ Item {
         when: windowShown
 
         function init() {
+            // A real transition, as from the screenshot, so the view takes
+            // the selection keys back.
+            fakeLens.state = "capturing";
             fakeLens.state = "selecting";
             fakeLens.errorString = "";
             fakeLens.text = "";
@@ -153,7 +156,8 @@ Item {
         function test_arrows_place_move_and_resize() {
             keyClick(Qt.Key_Right);
             verify(view.hasArea, "the first arrow places an area in the middle");
-            const first = view.area;
+            // A copy: a rect read from a property follows the property.
+            const first = Qt.rect(view.area.x, view.area.y, view.area.width, view.area.height);
             fuzzyCompare(first.x + first.width / 2, view.width / 2, 0.5);
             keyClick(Qt.Key_Right);
             compare(view.area.x, first.x + view.step);

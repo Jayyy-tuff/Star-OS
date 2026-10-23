@@ -70,37 +70,46 @@ FocusScope {
         }
     }
 
-    Keys.onPressed: event => {
-        const state = root.lens.state;
-        if (event.key === Qt.Key_Escape) {
-            if (state === "results") {
-                root.lens.selectAgain();
-            } else {
-                root.closeRequested();
-            }
-            event.accepted = true;
-            return;
-        }
-        if (state !== "selecting") {
-            return;
-        }
-        const resize = (event.modifiers & Qt.ShiftModifier) !== 0;
-        if (event.key === Qt.Key_A && (event.modifiers & Qt.ControlModifier)) {
-            root.selectAll();
-        } else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
-            root.confirm();
-        } else if (event.key === Qt.Key_Left) {
-            root.nudge(-root.step, 0, resize);
-        } else if (event.key === Qt.Key_Right) {
-            root.nudge(root.step, 0, resize);
-        } else if (event.key === Qt.Key_Up) {
-            root.nudge(0, -root.step, resize);
-        } else if (event.key === Qt.Key_Down) {
-            root.nudge(0, root.step, resize);
+    // Escape from anywhere in the view, the results included.
+    Keys.onEscapePressed: event => {
+        if (root.lens.state === "results") {
+            root.lens.selectAgain();
         } else {
-            return;
+            root.closeRequested();
         }
         event.accepted = true;
+    }
+
+    // The keys of the selection, on an item of their own: when results were
+    // shown, the focus must not stay on one of their (now hidden) buttons.
+    Item {
+        id: selectionKeys
+        objectName: "selectionKeys"
+        anchors.fill: parent
+        focus: true
+
+        Keys.onPressed: event => {
+            if (root.lens.state !== "selecting") {
+                return;
+            }
+            const resize = (event.modifiers & Qt.ShiftModifier) !== 0;
+            if (event.key === Qt.Key_A && (event.modifiers & Qt.ControlModifier)) {
+                root.selectAll();
+            } else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
+                root.confirm();
+            } else if (event.key === Qt.Key_Left) {
+                root.nudge(-root.step, 0, resize);
+            } else if (event.key === Qt.Key_Right) {
+                root.nudge(root.step, 0, resize);
+            } else if (event.key === Qt.Key_Up) {
+                root.nudge(0, -root.step, resize);
+            } else if (event.key === Qt.Key_Down) {
+                root.nudge(0, root.step, resize);
+            } else {
+                return;
+            }
+            event.accepted = true;
+        }
     }
 
     Connections {
@@ -109,8 +118,8 @@ FocusScope {
         function onStateChanged() {
             if (root.lens.state === "results") {
                 results.focusFirst();
-            } else if (root.lens.state === "selecting") {
-                root.forceActiveFocus(Qt.OtherFocusReason);
+            } else {
+                selectionKeys.forceActiveFocus(Qt.OtherFocusReason);
             }
         }
     }
@@ -187,7 +196,7 @@ FocusScope {
         enabled: root.lens.state === "selecting"
         cursorShape: Qt.CrossCursor
         onPressed: mouse => {
-            root.forceActiveFocus(Qt.MouseFocusReason);
+            selectionKeys.forceActiveFocus(Qt.MouseFocusReason);
             root.anchorPoint = Qt.point(mouse.x, mouse.y);
             root.area = Qt.rect(mouse.x, mouse.y, 0, 0);
         }
