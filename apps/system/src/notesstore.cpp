@@ -31,7 +31,9 @@ NotesStore::NotesStore(const QString &filePath, QObject *parent)
     : QAbstractListModel(parent)
     , m_filePath(filePath)
 {
-    // Saving replaces the file, so the folder is watched as well.
+    // Saving replaces the file, so the folder is watched as well. It is created
+    // now: a store started before the first note was saved must see it.
+    QDir().mkpath(QFileInfo(m_filePath).absolutePath());
     connect(&m_watcher, &QFileSystemWatcher::fileChanged, this, &NotesStore::reload);
     connect(&m_watcher, &QFileSystemWatcher::directoryChanged, this, &NotesStore::reload);
     reload();
@@ -87,7 +89,7 @@ int NotesStore::indexOf(const QString &noteId) const
     return -1;
 }
 
-QString NotesStore::add(const QString &text)
+QString NotesStore::addNote(const QString &text)
 {
     if (m_notes.size() >= MaxNotes) {
         return {};
@@ -104,7 +106,7 @@ QString NotesStore::add(const QString &text)
     return note.id;
 }
 
-void NotesStore::update(const QString &noteId, const QString &text)
+void NotesStore::updateNote(const QString &noteId, const QString &text)
 {
     const int row = indexOf(noteId);
     const QString limited = text.left(MaxTextLength);
@@ -116,7 +118,7 @@ void NotesStore::update(const QString &noteId, const QString &text)
     save();
 }
 
-void NotesStore::move(const QString &noteId, double posX, double posY)
+void NotesStore::moveNote(const QString &noteId, double posX, double posY)
 {
     const int row = indexOf(noteId);
     if (row < 0) {
@@ -128,7 +130,7 @@ void NotesStore::move(const QString &noteId, double posX, double posY)
     save();
 }
 
-void NotesStore::remove(const QString &noteId)
+void NotesStore::removeNote(const QString &noteId)
 {
     const int row = indexOf(noteId);
     if (row < 0) {

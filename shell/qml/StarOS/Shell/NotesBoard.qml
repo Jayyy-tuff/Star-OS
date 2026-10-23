@@ -4,10 +4,10 @@ pragma ComponentBehavior: Bound
 import QtQuick
 
 // Sticky notes on the desktop. `notes` is a list model with the roles noteId,
-// noteText, posX and posY, and the functions add(text) (returns the new id),
-// update(id, text), move(id, posX, posY) and remove(id): StarOS.System's
-// NotesStore in the session, a fake in tests. A "New note" button sits at the
-// top right.
+// noteText, posX and posY, and the functions addNote(text) (returns the new
+// id), updateNote(id, text), moveNote(id, posX, posY) and removeNote(id):
+// StarOS.System's NotesStore in the session, a fake in tests. A "New note"
+// button sits at the top right.
 Item {
     id: board
 
@@ -35,8 +35,8 @@ Item {
     // New notes cascade from the top left.
     function addNote(text) {
         const offset = (notesRepeater.count % 8) * 0.04;
-        const noteId = board.notes.add(text);
-        board.notes.move(noteId, 0.04 + offset, 0.06 + offset);
+        const noteId = board.notes.addNote(text);
+        board.notes.moveNote(noteId, 0.04 + offset, 0.06 + offset);
         Qt.callLater(() => {
             const item = board.noteItem(noteId);
             if (item) {
@@ -83,9 +83,9 @@ Item {
                 boardSize: Qt.size(area.width, area.height)
                 boardOrigin: Qt.point(board.boardOrigin.x + area.x, board.boardOrigin.y + area.y)
                 screenSize: board.screenSize
-                onTextEdited: (noteId, text) => board.notes.update(noteId, text)
-                onMoved: (noteId, posX, posY) => board.notes.move(noteId, posX, posY)
-                onDeleteRequested: noteId => board.notes.remove(noteId)
+                onTextEdited: (noteId, text) => board.notes.updateNote(noteId, text)
+                onMoved: (noteId, posX, posY) => board.notes.moveNote(noteId, posX, posY)
+                onDeleteRequested: noteId => board.notes.removeNote(noteId)
             }
         }
     }

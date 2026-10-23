@@ -41,7 +41,7 @@ void NotesStoreTest::init()
 {
     m_dir = std::make_unique<QTemporaryDir>();
     QVERIFY(m_dir->isValid());
-    // The folder does not exist yet; saving creates it.
+    // The folder does not exist yet; the store creates it.
     m_path = m_dir->filePath(u"staros/notes.json"_s);
 }
 
@@ -55,26 +55,26 @@ void NotesStoreTest::addUpdateMoveRemove()
     NotesStore store(m_path);
     QCOMPARE(store.rowCount(), 0);
     QSignalSpy count(&store, &NotesStore::countChanged);
-    const QString first = store.add(u"buy milk"_s);
+    const QString first = store.addNote(u"buy milk"_s);
     QVERIFY(!first.isEmpty());
-    const QString second = store.add(QString());
+    const QString second = store.addNote(QString());
     QCOMPARE(store.rowCount(), 2);
     QCOMPARE(count.count(), 2);
     QVERIFY(QFile::exists(m_path));
 
-    store.update(first, u"buy oat milk"_s);
+    store.updateNote(first, u"buy oat milk"_s);
     QCOMPARE(text(store, 0), u"buy oat milk"_s);
-    store.move(second, 0.25, 0.75);
+    store.moveNote(second, 0.25, 0.75);
     QCOMPARE(store.data(store.index(1), NotesStore::PosXRole).toDouble(), 0.25);
     QCOMPARE(store.data(store.index(1), NotesStore::PosYRole).toDouble(), 0.75);
 
-    store.remove(first);
+    store.removeNote(first);
     QCOMPARE(store.rowCount(), 1);
     QCOMPARE(store.data(store.index(0), NotesStore::NoteIdRole).toString(), second);
     // Unknown ids change nothing.
-    store.update(u"nope"_s, u"x"_s);
-    store.move(u"nope"_s, 0.5, 0.5);
-    store.remove(u"nope"_s);
+    store.updateNote(u"nope"_s, u"x"_s);
+    store.moveNote(u"nope"_s, 0.5, 0.5);
+    store.removeNote(u"nope"_s);
     QCOMPARE(store.rowCount(), 1);
 }
 
@@ -82,8 +82,8 @@ void NotesStoreTest::secondStoreSeesSavedNotes()
 {
     {
         NotesStore store(m_path);
-        const QString id = store.add(u"hello star"_s);
-        store.move(id, 0.1, 0.2);
+        const QString id = store.addNote(u"hello star"_s);
+        store.moveNote(id, 0.1, 0.2);
     }
     NotesStore again(m_path);
     QCOMPARE(again.rowCount(), 1);
@@ -95,7 +95,7 @@ void NotesStoreTest::externalChangeIsReloaded()
 {
     NotesStore one(m_path);
     NotesStore two(m_path);
-    one.add(u"from one"_s);
+    one.addNote(u"from one"_s);
     QTRY_COMPARE(two.rowCount(), 1);
     QCOMPARE(text(two, 0), u"from one"_s);
 }
@@ -123,15 +123,15 @@ void NotesStoreTest::badFileGivesNoNotes()
 void NotesStoreTest::positionsAndTextAreLimited()
 {
     NotesStore store(m_path);
-    const QString id = store.add(QString(NotesStore::MaxTextLength + 50, u'a'));
+    const QString id = store.addNote(QString(NotesStore::MaxTextLength + 50, u'a'));
     QCOMPARE(int(text(store, 0).size()), NotesStore::MaxTextLength);
-    store.move(id, std::numeric_limits<double>::quiet_NaN(), 2.0);
+    store.moveNote(id, std::numeric_limits<double>::quiet_NaN(), 2.0);
     QCOMPARE(store.data(store.index(0), NotesStore::PosXRole).toDouble(), 0.0);
     QCOMPARE(store.data(store.index(0), NotesStore::PosYRole).toDouble(), 1.0);
     for (int i = 1; i < NotesStore::MaxNotes; ++i) {
-        QVERIFY(!store.add(QString()).isEmpty());
+        QVERIFY(!store.addNote(QString()).isEmpty());
     }
-    QVERIFY(store.add(u"one too many"_s).isEmpty());
+    QVERIFY(store.addNote(u"one too many"_s).isEmpty());
     QCOMPARE(store.rowCount(), NotesStore::MaxNotes);
 }
 

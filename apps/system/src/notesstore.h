@@ -43,10 +43,10 @@ public:
     QString filePath() const;
 
     // Returns the new note's id, or an empty string when the limit is reached.
-    Q_INVOKABLE QString add(const QString &text);
-    Q_INVOKABLE void update(const QString &noteId, const QString &text);
-    Q_INVOKABLE void move(const QString &noteId, double posX, double posY);
-    Q_INVOKABLE void remove(const QString &noteId);
+    Q_INVOKABLE QString addNote(const QString &text);
+    Q_INVOKABLE void updateNote(const QString &noteId, const QString &text);
+    Q_INVOKABLE void moveNote(const QString &noteId, double posX, double posY);
+    Q_INVOKABLE void removeNote(const QString &noteId);
     Q_INVOKABLE void reload();
 
 Q_SIGNALS:

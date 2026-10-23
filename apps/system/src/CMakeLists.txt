@@ -13,6 +13,9 @@ qt_add_qml_module(staros_system
 )
 
 target_link_libraries(staros_system PRIVATE Qt6::Core Qt6::Qml)
+# KDECMakeSettings drops the prefix of MODULE libraries; the QML engine looks
+# for lib<plugin>.so.
+set_target_properties(staros_system PROPERTIES PREFIX "lib")
 
 set(module_dir ${KDE_INSTALL_QMLDIR}/StarOS/System)
 install(TARGETS staros_system DESTINATION ${module_dir})

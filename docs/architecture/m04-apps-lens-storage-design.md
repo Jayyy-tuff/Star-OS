@@ -49,17 +49,20 @@ only from CI runs and the owner's VMware run.
   shows "New sticky note: <text>"; Return emits `noteRequested(text)` and
   closes. Otherwise Return launches the first app as before. Down still moves
   to the grid.
-- `NotesBoard` and `StickyNote`: notes on the desktop from a model with
-  `noteId, text, x, y` and the functions `update(id, text)`, `move(id, x, y)`,
-  `remove(id)`. Each note is glass, keyboard-editable (Tab between notes,
-  Delete button "Delete note"), accessible name "Sticky note", description the
-  text. A "New note" button (top right) calls `add("")`.
-- `SystemMeter`: a taskbar button named "System status" whose description
-  reads e.g. "Star Storage: 9.8 GB free of 16 GB. Memory: 1.2 GB of 3.9 GB in
-  use. Battery: 80 %". Opens a glass pop-up with bars for storage and memory
-  and, when present, battery. In live mode it says "Live session: changes are
-  lost at shutdown" and offers "Set up Star Storage". It takes a `status`
-  object (fakes in tests).
+- `NotesBoard` and `StickyNote`: notes on the desktop from a model with the
+  roles `noteId, noteText, posX, posY` and the functions `addNote(text)`,
+  `updateNote(id, text)`, `moveNote(id, x, y)`, `removeNote(id)` (not `add`,
+  `move` or `remove`, which a `ListModel` already has). Each note is glass,
+  keyboard-editable (Tab between notes, Delete button "Delete note"),
+  accessible name "Sticky note", description the text. A "New note" button
+  (top right) calls `addNote("")`.
+- `SystemMeter`: a taskbar button named "System status" with two small bars
+  (storage and memory in use) and the free storage ("Live · 3.2 GB free" in
+  the live session). Its description reads e.g. "Star Storage: 9.8 GB free of
+  16 GB. Memory: 1.2 GB of 3.9 GB in use. Battery: 80 %." or, live, "Live
+  session: changes are lost at shutdown. …". Activating it opens Star Storage,
+  which has the details and "Set up Star Storage". It takes a `status` object
+  (fakes in tests).
 
 ## 3. StarOS.System (C++ QML module, package `staros-system`)
 
@@ -76,7 +79,9 @@ now cover `StarOS/Shell` only).
   parameters for tests.
 - `NotesStore` (QML_SINGLETON): a list model of notes saved as JSON in
   `$XDG_DATA_HOME/staros/notes.json` (atomic save with `QSaveFile`, reloaded
-  when another process changes the file). `add(text)` returns the id.
+  when another process changes the file). `addNote(text)` returns the id.
+  The plugin library is `libstaros_system.so` (KDECMakeSettings drops the
+  prefix of MODULE libraries, so the build sets it).
 - `StorageSetup`: none here; see section 6.
 
 ## 4. Files and Sun Store improvements

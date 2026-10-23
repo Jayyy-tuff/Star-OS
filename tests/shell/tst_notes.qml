@@ -14,6 +14,8 @@ Item {
     width: 1280
     height: 720
 
+    // The functions have their own names, so ListModel's remove() and move()
+    // stay usable.
     ListModel {
         id: fakeNotes
 
@@ -31,24 +33,24 @@ Item {
             }
             return -1;
         }
-        function add(text) {
+        function addNote(text) {
             const noteId = "n" + fakeNotes.nextId;
             fakeNotes.nextId += 1;
             fakeNotes.append({noteId: noteId, noteText: text, posX: 0, posY: 0});
             fakeNotes.record("add:" + text);
             return noteId;
         }
-        function update(noteId, text) {
+        function updateNote(noteId, text) {
             fakeNotes.setProperty(fakeNotes.indexOf(noteId), "noteText", text);
             fakeNotes.record("update:" + noteId + ":" + text);
         }
-        function move(noteId, posX, posY) {
+        function moveNote(noteId, posX, posY) {
             const row = fakeNotes.indexOf(noteId);
             fakeNotes.setProperty(row, "posX", posX);
             fakeNotes.setProperty(row, "posY", posY);
             fakeNotes.record("move:" + noteId);
         }
-        function remove(noteId) {
+        function removeNote(noteId) {
             fakeNotes.remove(fakeNotes.indexOf(noteId));
             fakeNotes.record("remove:" + noteId);
         }
@@ -66,6 +68,7 @@ Item {
 
         function init() {
             fakeNotes.clear();
+            fakeNotes.nextId = 1;
             fakeNotes.calls = [];
             board.forceActiveFocus();
         }
@@ -101,7 +104,7 @@ Item {
         }
 
         function test_typing_is_saved() {
-            fakeNotes.add("");
+            fakeNotes.addNote("");
             tryVerify(() => noteAt(0) !== null, 5000);
             const editor = findChild(noteAt(0), "editor");
             editor.forceActiveFocus();
@@ -113,7 +116,7 @@ Item {
         }
 
         function test_leaving_saves_at_once() {
-            fakeNotes.add("old");
+            fakeNotes.addNote("old");
             tryVerify(() => noteAt(0) !== null, 5000);
             const editor = findChild(noteAt(0), "editor");
             editor.forceActiveFocus();
@@ -125,22 +128,22 @@ Item {
         }
 
         function test_position_follows_the_model() {
-            fakeNotes.add("a");
+            fakeNotes.addNote("a");
             tryVerify(() => noteAt(0) !== null, 5000);
             const note = noteAt(0);
             const area = findChild(board, "notesArea");
-            fakeNotes.move("n1", 1, 0.5);
+            fakeNotes.moveNote("n1", 1, 0.5);
             compare(note.x, Math.round(area.width - note.width));
             compare(note.y, Math.round(0.5 * (area.height - note.height)));
             // Out-of-range positions stay on the board.
-            fakeNotes.move("n1", 2, -1);
+            fakeNotes.moveNote("n1", 2, -1);
             compare(note.x, Math.round(area.width - note.width));
             compare(note.y, 0);
         }
 
         function test_delete() {
-            fakeNotes.add("a");
-            fakeNotes.add("b");
+            fakeNotes.addNote("a");
+            fakeNotes.addNote("b");
             tryVerify(() => noteAt(1) !== null, 5000);
             mouseClick(findChild(noteAt(0), "deleteButton"));
             compare(fakeNotes.count, 1);
@@ -149,8 +152,8 @@ Item {
         }
 
         function test_tab_moves_between_notes() {
-            fakeNotes.add("a");
-            fakeNotes.add("b");
+            fakeNotes.addNote("a");
+            fakeNotes.addNote("b");
             tryVerify(() => noteAt(1) !== null, 5000);
             const first = findChild(noteAt(0), "editor");
             first.forceActiveFocus();

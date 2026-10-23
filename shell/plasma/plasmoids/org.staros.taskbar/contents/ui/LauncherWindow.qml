@@ -75,9 +75,9 @@ Window {
         // Notes typed as "note: ..." go to the desktop's notes, cascading.
         onNoteRequested: text => {
             const offset = (NotesStore.count % 8) * 0.04;
-            const noteId = NotesStore.add(text);
+            const noteId = NotesStore.addNote(text);
             if (noteId !== "") {
-                NotesStore.move(noteId, 0.04 + offset, 0.06 + offset);
+                NotesStore.moveNote(noteId, 0.04 + offset, 0.06 + offset);
             }
             console.info("STAROS-SHELL note=" + (noteId !== "" ? "added" : "full"));
         }
