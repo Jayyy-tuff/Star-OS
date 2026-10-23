@@ -11,7 +11,7 @@ security uncertainties, and record human approval of the architecture.
 | Repository initialized | this repo | Done (documentation only) |
 | License and contribution policy | ADR-0007, LICENSES.md, CONTRIBUTING.md | License accepted (GPL-3.0-or-later; docs CC-BY-SA-4.0). Contribution policy: draft |
 | Initial threat model | docs/security/threat-model.md | Draft |
-| Architecture decision records | docs/decisions/ | 0001–0005, 0007–0010 accepted; 0006 deferred |
+| Architecture decision records | docs/decisions/ | 0001–0005, 0007–0012 accepted (0011's live polkit rule awaits owner review); 0006 deferred |
 | Supported hardware assumptions | below | Draft |
 | Package baseline policy | ADR-0002 | Accepted |
 | Wayland/compositor evaluation | ADR-0004 | KWin accepted; shell hosting decided by M0.2 |
@@ -20,6 +20,7 @@ security uncertainties, and record human approval of the architecture.
 | Build environment setup | ADR-0003 + milestone M0.1 | **M0.1 complete** (CI build, QEMU boots, VMware boot) |
 | Qt/QML shell prototype | milestone M0.2 | CI green (run 12); owner's VMware run pending |
 | Glass theme, Files, Sun Store | milestone M0.3 | CI green (run 18); owner's VMware run pending |
+| Apps, Star Lens, Star Storage, desktop features | milestone M0.4 | CI green (run 24); owner's VMware run and review of the live storage rule pending |
 | Moon Browser integration checklist | — | Removed from the current scope at the owner's request (2026-10-19); the owner will add Moon Browser later. No other browser will be substituted without approval |
 
 ## Smallest useful deliverable: M0.1 — console ISO prototype
@@ -252,6 +253,112 @@ llvmpipe; not VMware or hardware results):
 
 Still to do: the owner's VMware run (procedure in `test-plan.md`, with
 network for installing an app from Flathub, 3D on and off).
+
+## M0.4 — apps, Star Lens, Star Storage and desktop features (CI green; VMware run pending)
+
+Requested by the owner on 2026-10-23: better apps, Firefox, VLC and similar
+apps, features unique to Star OS including one "like Google Lens", and "a
+disk storage to install things & make it visible in the os". Owner decisions
+the same day: preinstall a core set; offline recognition plus Google Lens on
+request (ADR-0012); a persistent live disk (ADR-0011); storage and system
+meter, quick answers in the launcher, desktop sticky notes. The design
+contract is `docs/architecture/m04-apps-lens-storage-design.md`; the tests
+are T0-35..T0-40 in `test-plan.md`.
+
+What exists in the repository:
+
+- Preinstalled from Arch: Firefox, VLC, Okular, Gwenview, Ark, KWrite, KCalc,
+  Tesseract with English data; all in the launcher's catalogue.
+- `apps/system/` (`staros-system`): the `StarOS.System` QML module with
+  `SystemStatus` (storage and memory, where changes are kept) and
+  `NotesStore` (`~/.local/share/staros/notes.json`).
+- `StarOS.Shell`: quick answers in the launcher (sums, percentages, units),
+  the sticky notes board on the desktop (`note: …` in the launcher or "New
+  note"), and the System status button in the taskbar, which opens Star
+  Storage.
+- `apps/lens/` (`staros-lens`, Meta+Shift+L): screenshot through KWin's
+  grant for its desktop file, area selection by mouse or keyboard, offline
+  text (Tesseract) and QR/barcode (Prison) recognition, copy, save, open
+  found links, web search, and Google Lens only after a warning each time.
+- `apps/storage/` (`staros-storage`): Star Storage with its root helper,
+  polkit action and live rule, and the "with Star Storage" boot entries.
+- Files: sort by name, size or time, free space, type icons and image
+  thumbnails, Open Terminal, a Storage panel. Sun Store: "Star picks" (14
+  free apps on Flathub) first, and a banner that explains where installed
+  apps are kept.
+
+### Status (2026-10-23, CI run 24 on commit be49e21: every job green)
+
+Measured in CI (QEMU/KVM on GitHub's runners, software rendering with
+llvmpipe; not VMware or hardware results). The first attempt of run 24
+stopped while downloading packages from the Arch Linux Archive (the ISO
+build, before any test); the re-run of the failed jobs passed. Runs 19–23
+fixed: the QML plugin's file name, the notes folder watch, a test double
+that hid QML's own functions, a missing Qt Quick link, a Star Lens hang
+without a session bus, keyboard focus and a live rectangle in the Lens view,
+and two Star Storage test-harness problems (a pipe left open for the
+helper, rows read before they existed).
+
+- **Packages (T0-35..T0-40 unit parts):** five packages build in the pinned
+  container and pass all their suites: StarOS.System 3 of 3, Files 6 of 6,
+  Star Lens 5 of 5 (recognition of rendered text, a QR code and an EAN-13
+  barcode; the backend at scale 2; the view; the real window), Star
+  Storage 5 of 5, Sun Store 8 of 8. The helper's own 18 tests run in lint;
+  the shell's QML tests (quick answers, notes, system meter, launcher) in
+  `shell-checks`.
+- **Image:** 946 packages, matching the updated baseline (T0-05). Every image
+  policy check passes, including the new ones: the seven apps and their
+  desktop files, Star Lens's screenshot grant and shortcut, the English OCR
+  data, the helper (root:root 755), the polkit action (administrator, exec
+  path) and the live rule (one action, `liveuser` only). The build checks
+  that exactly one UEFI and one BIOS "with Star Storage" entry exist, with a
+  per-build folder and no placeholder left. The ISO artifact is about
+  2.48 GB.
+- **Session (QEMU):** UEFI and BIOS boots reach the session; S0–S9, S12 and
+  S13 pass. Files shows "Sort: Name", "Open Terminal", the Storage panel with
+  "Set up Star Storage" and "9 items · 1.9 GiB free". Sun Store lists "Star
+  picks" first and says "Live session: apps you install are removed at
+  shutdown." S14: "12*3" shows "Answer: 36"; Return copies it. S15: "note:
+  hello star" is saved in `notes.json` and shown as a "Sticky note" on the
+  desktop. S16: System status says "Live session: changes are lost at
+  shutdown. 2 GB free of 2 GB. Memory: 1.6 GB of 4.1 GB in use." S17:
+  Meta+Shift+L starts Star Lens and KWin grants its screenshot ("Select an
+  area"). S11 (informational): 13 tiles inside the launcher with no problems
+  at 150, 200 and 100 %. S10 (informational): Orca speaks "Search
+  applications", "Ark button", "Archiving Tool", "Files button".
+- **Star Storage over three boots (T0-40, QEMU, 10 GiB scratch image):**
+  B1: the helper lists the scratch disk as usable; Star Storage opens from
+  the launcher; Tab reaches "Disk name to confirm"; typing `vda` and Return
+  ends with "Star Storage is ready on /dev/vda1."; `blkid` reports an ext4
+  file system labelled `STAROS_DATA` on a GPT partition of that name;
+  "Restart into Star Storage" has the focus and Return restarts. B2: the
+  one-shot entry booted (`cow_label=STAROS_DATA
+  cow_directory=persistent_2026-10-23-12-35-27-00/x86_64`), the
+  copy-on-write space is `/dev/vda1` (ext4), System status says "Star
+  Storage: 10.4 GB free of 10.5 GB. …", the app refuses the disk in use
+  ("Star OS is using this Star Storage now."), Shift+Tab and Space turn on
+  "Always start with Star Storage" ("Star OS now starts with Star Storage
+  every time."). B3: the default entry is now Star Storage and the marker
+  file written in B2 is still there.
+- **Idle (T0-25):** three boots, all stable. Median (min–max): session PSS
+  817.3 MiB (807.1–823.5), plasmashell 442.0 MiB, kwin_wayland 192.3 MiB,
+  1093 MiB in use, session CPU 0.18 % of one CPU, 30 processes. Compared with
+  M0.3, plasmashell uses about 36 MiB more (notes board, system meter, quick
+  answers) and idle CPU rose from 0.07 % to 0.18 %, probably the system
+  meter's 5-second refresh. Not a performance claim.
+
+S17 note: run 24 also reported "Results" after Ctrl+A and Return, but that
+check also counted hidden objects, so it did not prove that recognition had
+finished. Commit 3ada26a counts only objects on screen (S12, S13, S17 and
+the Star Storage checks); its CI result is added here when the run ends.
+
+Not tested in CI: recognition quality on real screens, Google Lens and web
+search (no network), Firefox and VLC beyond their packages and desktop files,
+Star Storage on USB sticks or internal disks, and BIOS boots with Star
+Storage (the storage test uses UEFI).
+
+Still to do: the owner's VMware run (`test-plan.md`, M0.4 procedure) and
+the owner's review of the live polkit rule (ADR-0011).
 
 ## Supported hardware assumptions (Phase 0)
 

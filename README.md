@@ -25,10 +25,17 @@ What has been tested:
   apps are built and unit-tested as packages, open from the launcher, and
   expose their accessible lists and buttons; Sun Store asks before adding
   Flathub and adds nothing on its own (CI run 18, 2026-10-22).
+- **Apps, Star Lens and Star Storage in QEMU (CI, milestone M0.4):** Firefox,
+  VLC, Okular, Gwenview, Ark, KWrite and KCalc are in the image and the
+  launcher; quick answers, desktop sticky notes and the System status meter
+  work in the session; Star Lens takes its screenshot through KWin's grant;
+  Star Storage sets up a 10 GiB virtual disk by keyboard, and what was saved
+  on it was still there two restarts later (CI run 24, 2026-10-23).
 
 What has **not** been tested: any real hardware, any installation (there is no
-installer yet), the graphical session in VMware, and installing an app from
-Flathub (the CI virtual machine has no internet access). This README claims a capability only once a recorded test
+installer yet), the graphical session in VMware, installing an app from
+Flathub, Google Lens and web search (the CI virtual machine has no internet
+access), and Star Storage on a real USB stick or disk. This README claims a capability only once a recorded test
 shows it.
 Prototype ISOs are unsigned test artifacts.
 
@@ -37,7 +44,7 @@ What exists today:
 | Area | Document | State |
 | --- | --- | --- |
 | Build environment inspection | [docs/development/environment-report-2026-10-19.md](docs/development/environment-report-2026-10-19.md) | Done |
-| Phase 0 plan and milestones | [docs/development/phase-0-plan.md](docs/development/phase-0-plan.md) | M0.1 complete; M0.2 (shell prototype) and M0.3 (glass, Files, Sun Store) green in CI, VMware runs pending |
+| Phase 0 plan and milestones | [docs/development/phase-0-plan.md](docs/development/phase-0-plan.md) | M0.1 complete; M0.2 (shell prototype), M0.3 (glass, Files, Sun Store) and M0.4 (apps, Star Lens, Star Storage) green in CI, VMware runs pending |
 | Building and boot-testing the ISO | [docs/development/building.md](docs/development/building.md) | Draft |
 | Architecture decision records | [docs/decisions/](docs/decisions/README.md) | Mostly accepted; ADR-0006 deferred to Phase 2 |
 | Test plan | [docs/development/test-plan.md](docs/development/test-plan.md) | Draft |
