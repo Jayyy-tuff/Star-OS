@@ -226,8 +226,8 @@ FocusScope {
             Accessible.role: Accessible.StaticText
             Accessible.name: text
             onTextChanged: {
-                if (text !== "") {
-                    messageLabel.Accessible.announce(text);
+                if (messageLabel.text !== "") {
+                    messageLabel.Accessible.announce(messageLabel.text);
                 }
             }
         }

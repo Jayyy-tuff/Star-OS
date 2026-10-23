@@ -168,7 +168,9 @@ void StorageBackend::listDisks()
             listFinished(-1, QProcess::CrashExit);
         }
     });
-    m_list->start();
+    // The helper and pkexec read nothing; no open input pipe is left behind.
+    m_list->setStandardInputFile(QProcess::nullDevice());
+    m_list->start(QIODevice::ReadOnly);
 }
 
 void StorageBackend::listFinished(int exitCode, QProcess::ExitStatus status)
@@ -227,7 +229,9 @@ void StorageBackend::format(const QString &name, const QString &confirmation)
             formatFinished(-1, QProcess::CrashExit);
         }
     });
-    m_format->start();
+    // The helper and pkexec read nothing; no open input pipe is left behind.
+    m_format->setStandardInputFile(QProcess::nullDevice());
+    m_format->start(QIODevice::ReadOnly);
 }
 
 void StorageBackend::readFormatOutput()
@@ -298,7 +302,9 @@ void StorageBackend::runBoot(const QString &mode, bool restart)
             bootFinished(mode, restart, 127, QProcess::CrashExit);
         }
     });
-    m_boot->start();
+    // The helper and pkexec read nothing; no open input pipe is left behind.
+    m_boot->setStandardInputFile(QProcess::nullDevice());
+    m_boot->start(QIODevice::ReadOnly);
 }
 
 void StorageBackend::bootFinished(const QString &mode, bool restart, int exitCode, QProcess::ExitStatus status)

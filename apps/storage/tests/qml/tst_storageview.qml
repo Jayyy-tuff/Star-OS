@@ -103,8 +103,16 @@ Item {
         function rows() {
             const list = findChild(view, "disks");
             const found = [];
+            // The list grows to its content after polishing; wait for every row.
+            tryVerify(() => {
+                for (let i = 0; i < list.count; ++i) {
+                    if (list.itemAtIndex(i) === null) {
+                        return false;
+                    }
+                }
+                return true;
+            }, 5000, "every row is created");
             for (let i = 0; i < list.count; ++i) {
-                list.positionViewAtIndex(i, ListView.Contain);
                 found.push(list.itemAtIndex(i));
             }
             return found;

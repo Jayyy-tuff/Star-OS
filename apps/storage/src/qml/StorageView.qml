@@ -210,7 +210,7 @@ FocusScope {
                 currentIndex: -1
                 keyNavigationEnabled: true
                 highlightMoveDuration: 0
-                activeFocusOnTab: count > 0
+                activeFocusOnTab: true
                 spacing: 2
 
                 Accessible.role: Accessible.List
@@ -372,8 +372,8 @@ FocusScope {
                     Accessible.role: Accessible.StaticText
                     Accessible.name: text
                     onTextChanged: {
-                        if (stepText.visible && text !== "") {
-                            stepText.Accessible.announce(text);
+                        if (stepText.visible && stepText.text !== "") {
+                            stepText.Accessible.announce(stepText.text);
                         }
                     }
                 }
@@ -469,8 +469,8 @@ FocusScope {
                 Accessible.role: Accessible.StaticText
                 Accessible.name: text
                 onTextChanged: {
-                    if (text !== "") {
-                        messageLabel.Accessible.announce(text);
+                    if (messageLabel.text !== "") {
+                        messageLabel.Accessible.announce(messageLabel.text);
                     }
                 }
             }

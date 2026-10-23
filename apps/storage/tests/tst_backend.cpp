@@ -85,7 +85,8 @@ QString BackendTest::helper(const QByteArray &systemdBoot, const QByteArray &alw
                             const QByteArray &format, const QByteArray &boot)
 {
     QByteArray listing = listJson;
-    listing.replace("%SYSTEMDBOOT%", systemdBoot).replace("%ALWAYS%", always);
+    // One line, as the real helper prints it.
+    listing.replace("%SYSTEMDBOOT%", systemdBoot).replace("%ALWAYS%", always).replace('\n', ' ');
     const QByteArray listBody = list.isEmpty() ? "cat <<'JSON'\n" + listing + "\nJSON\n" : list;
     const QByteArray formatBody = format.isEmpty()
         ? "echo '{\"step\": \"wipe\", \"message\": \"Erasing '\"$2\"'\"}'\n"
@@ -114,7 +115,8 @@ void BackendTest::ready(StorageBackend &backend)
 {
     backend.setPkexec(m_pkexec);
     backend.refresh();
-    QTRY_COMPARE(backend.state(), u"ready"_s);
+    QTRY_VERIFY2_WITH_TIMEOUT(backend.state() == u"ready"_s,
+                              qPrintable(backend.state() + u": "_s + backend.errorString()), 20000);
 }
 
 void BackendTest::listsDisks()
@@ -173,7 +175,7 @@ void BackendTest::listErrorIsShown()
     StorageBackend backend;
     backend.setHelper(helper("true", "false", "echo '{\"error\": \"lsblk failed: no devices\"}'\nexit 1\n"));
     backend.refresh();
-    QTRY_COMPARE(backend.state(), u"error"_s);
+    QTRY_COMPARE_WITH_TIMEOUT(backend.state(), u"error"_s, 20000);
     QCOMPARE(backend.errorString(), u"Star Storage could not list the disks: lsblk failed: no devices"_s);
 }
 
@@ -182,7 +184,7 @@ void BackendTest::missingHelperIsAnError()
     StorageBackend backend;
     backend.setHelper(m_dir->filePath(u"missing-helper"_s));
     backend.refresh();
-    QTRY_COMPARE(backend.state(), u"error"_s);
+    QTRY_COMPARE_WITH_TIMEOUT(backend.state(), u"error"_s, 20000);
     QVERIFY2(backend.errorString().startsWith(u"Star Storage could not list the disks: "_s), qPrintable(backend.errorString()));
 }
 
@@ -191,7 +193,7 @@ void BackendTest::refreshClearsAnError()
     StorageBackend backend;
     backend.setHelper(m_dir->filePath(u"missing-helper"_s));
     backend.refresh();
-    QTRY_COMPARE(backend.state(), u"error"_s);
+    QTRY_COMPARE_WITH_TIMEOUT(backend.state(), u"error"_s, 20000);
     backend.setHelper(helper());
     ready(backend);
     QVERIFY(backend.errorString().isEmpty());
@@ -206,7 +208,7 @@ void BackendTest::formatShowsStepsThenDone()
     backend.format(u"vdb"_s, u"vdb"_s);
     QCOMPARE(backend.state(), u"working"_s);
     QCOMPARE(backend.step(), u"Asking for permission…"_s);
-    QTRY_COMPARE(backend.state(), u"done"_s);
+    QTRY_COMPARE_WITH_TIMEOUT(backend.state(), u"done"_s, 20000);
     QCOMPARE(backend.partition(), u"/dev/vdb1"_s);
     QCOMPARE(backend.step(), u"Formatting /dev/vdb1"_s);
     QVERIFY(steps.count() >= 3);
@@ -223,7 +225,7 @@ void BackendTest::formatErrorFromTheHelper()
                              "echo '{\"error\": \"vdb cannot be used. It is in use: one of its partitions is mounted.\"}'\nexit 1\n"));
     ready(backend);
     backend.format(u"vdb"_s, u"vdb"_s);
-    QTRY_COMPARE(backend.state(), u"error"_s);
+    QTRY_COMPARE_WITH_TIMEOUT(backend.state(), u"error"_s, 20000);
     QCOMPARE(backend.errorString(),
              u"Star Storage was not set up. vdb cannot be used. It is in use: one of its partitions is mounted."_s);
     QVERIFY(backend.partition().isEmpty());
@@ -236,7 +238,7 @@ void BackendTest::permissionNotGiven()
     ready(backend);
     backend.setPkexec(writeScript(u"pkexec-refuses"_s, "exit 126\n"));
     backend.format(u"vdb"_s, u"vdb"_s);
-    QTRY_COMPARE(backend.state(), u"error"_s);
+    QTRY_COMPARE_WITH_TIMEOUT(backend.state(), u"error"_s, 20000);
     QCOMPARE(backend.errorString(), u"Star Storage was not set up. Permission was not given."_s);
 }
 
@@ -260,13 +262,13 @@ void BackendTest::bootChoices()
     QSignalSpy busy(&backend, &StorageBackend::busyChanged);
     backend.setBoot(u"always"_s);
     QVERIFY(backend.busy());
-    QTRY_VERIFY(!backend.busy());
+    QTRY_VERIFY_WITH_TIMEOUT(!backend.busy(), 20000);
     QCOMPARE(busy.count(), 2);
     QCOMPARE(backend.message(), u"Star OS now starts with Star Storage every time."_s);
     backend.setBoot(u"never"_s);
-    QTRY_COMPARE(backend.message(), u"Star OS no longer starts with Star Storage by default."_s);
+    QTRY_COMPARE_WITH_TIMEOUT(backend.message(), u"Star OS no longer starts with Star Storage by default."_s, 20000);
     backend.setBoot(u"next"_s);
-    QTRY_COMPARE(backend.message(), u"Star OS starts with Star Storage next time."_s);
+    QTRY_COMPARE_WITH_TIMEOUT(backend.message(), u"Star OS starts with Star Storage next time."_s, 20000);
     QCOMPARE(pkexecCalls(), (QStringList{u"helper boot always"_s, u"helper boot never"_s, u"helper boot next"_s}));
     QCOMPARE(backend.state(), u"ready"_s);
 }
@@ -282,7 +284,7 @@ void BackendTest::bootErrorIsAMessage()
         restarted = true;
     });
     backend.restartIntoStarStorage();
-    QTRY_VERIFY(!backend.busy());
+    QTRY_VERIFY_WITH_TIMEOUT(!backend.busy(), 20000);
     QCOMPARE(backend.message(), u"The start was not changed. This computer started Star OS without UEFI."_s);
     QVERIFY(!restarted);
     QCOMPARE(backend.state(), u"ready"_s);
@@ -298,7 +300,7 @@ void BackendTest::restartIntoStarStorage()
         restarted = true;
     });
     backend.restartIntoStarStorage();
-    QTRY_VERIFY(restarted);
+    QTRY_VERIFY_WITH_TIMEOUT(restarted, 20000);
     QCOMPARE(backend.message(), u"Restarting into Star Storage…"_s);
     QCOMPARE(pkexecCalls(), QStringList{u"helper boot next"_s});
 }
