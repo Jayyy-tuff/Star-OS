@@ -7,7 +7,7 @@
 
 cmake_minimum_required(VERSION 3.22)
 
-project(staros-sunstore VERSION 0.3.0 LANGUAGES CXX)
+project(staros-sunstore VERSION 0.4.0 LANGUAGES CXX)
 
 set(QT_MIN_VERSION "6.12.0")
 set(KF_MIN_VERSION "6.31.0")

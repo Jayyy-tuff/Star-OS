@@ -26,6 +26,9 @@ Scenarios:
   S15 sticky note: "note: hello star" puts a note on the desktop and in
       ~/.local/share/staros/notes.json
   S16 the taskbar's "System status" says the session is live (in memory)
+  S17 Star Lens (Meta+Shift+L, else the launcher) takes a screenshot through
+      KWin's grant, asks to select an area; Ctrl+A, Return show the results
+      (the recognised text is informational); Escape twice closes it
   Informational: S11 scaling with kscreen-doctor (AT-SPI geometry and screen
   dumps at 150, 200 and 100 %), S10 Orca (Meta+Alt+S, then a debug Orca's
   speech output for the launcher).
@@ -63,6 +66,7 @@ KONSOLE = "konsole"
 SETTINGS = "systemsettings"
 FILES = "org.staros.files"
 SUNSTORE = "org.staros.sunstore"
+LENS = "org.staros.lens"
 # The live medium's writable layer (M0.3, scripts/build-iso.sh).
 KERNEL_PARAM = "cow_spacesize=50%"
 
@@ -108,35 +112,75 @@ class Session:
 
     # ----- QEMU --------------------------------------------------------------
 
-    def start(self, iso):
+    def start(self, iso, name="session", vars_file=None, extra=()):
+        """Boots ISO with UEFI. NAME names the logs; VARS_FILE keeps the UEFI
+        variables between boots (a fresh copy otherwise); EXTRA adds QEMU
+        arguments, such as a scratch disk."""
         fw = "uefi"
-        self.serial_log = os.path.join(self.log_dir, "serial-session.log")
-        self.qemu_log = os.path.join(self.log_dir, "qemu-session.log")
+        self.serial_log = os.path.join(self.log_dir, f"serial-{name}.log")
+        self.qemu_log = os.path.join(self.log_dir, f"qemu-{name}.log")
         self.sock_dir = tempfile.mkdtemp(prefix="staros-session-")
         self.qmp_socket = os.path.join(self.sock_dir, "qmp.sock")
         self.qga_socket = os.path.join(self.sock_dir, "qga.sock")
         pair = boot_test.find_ovmf()
         if pair is None:
             raise boot_test.SetupError("OVMF firmware not found")
-        vars_copy = os.path.join(self.log_dir, "ovmf-vars-session.fd")
-        shutil.copyfile(pair[1], vars_copy)
+        if vars_file is None:
+            vars_file = os.path.join(self.log_dir, f"ovmf-vars-{name}.fd")
+            shutil.copyfile(pair[1], vars_file)
         accel = "kvm" if os.access("/dev/kvm", os.R_OK | os.W_OK) else "tcg"
         cmd = boot_test.build_qemu_command(
             shutil.which(self.args.qemu) or self.args.qemu, iso, fw, accel,
             boot_test.PROFILES["graphical"]["memory"], self.serial_log, self.qmp_socket,
-            pair[0], vars_copy, "graphical")
-        extra = [
+            pair[0], vars_file, "graphical")
+        devices = [
             "-device", "virtio-serial-pci,id=vser0",
             "-chardev", f"socket,id=qga0,path={self.qga_socket},server=on,wait=off",
             "-device", "virtserialport,bus=vser0.0,chardev=qga0,name=org.qemu.guest_agent.0",
             "-device", "qemu-xhci,id=xhci",
             "-device", "usb-tablet,bus=xhci.0",
+            *extra,
         ]
-        cmd = cmd[:-1] + extra + cmd[-1:]
+        cmd = cmd[:-1] + devices + cmd[-1:]
         print("+ " + shlex.join(cmd), flush=True)
         with open(self.qemu_log, "wb") as out:
             self.proc = subprocess.Popen(cmd, stdout=out, stderr=subprocess.STDOUT)
         self.started = time.monotonic()
+
+    def connect_agent(self, seconds=120):
+        """Connects to the guest agent (udev starts it when the port
+        appears). Returns None, or the last error after SECONDS."""
+        self.agent = qga.GuestAgent(self.qga_socket, timeout=10)
+        deadline = time.monotonic() + seconds
+        while True:
+            try:
+                self.agent.connect()
+                self.agent.sync(timeout=10)
+                return None
+            except (OSError, qga.GuestAgentError) as err:
+                if time.monotonic() > deadline:
+                    return err
+                time.sleep(3)
+
+    def install_helpers(self):
+        """Copies the guest helpers to GUEST_DIR (tmpfs), starts the oracle
+        listener and loads the KWin oracle script. Returns (script id or None,
+        bus error text)."""
+        for name in HELPERS:
+            with open(os.path.join(HERE, "guest", name), encoding="utf-8") as f:
+                self.agent.write_file(f"{GUEST_DIR}/{name}", f.read(), mode="0644")
+        self.guest(["/usr/bin/chmod", "0755", GUEST_DIR])
+        self.as_user(["/usr/bin/python3", "-I", f"{GUEST_DIR}/oracle_listener.py", ORACLE_FILE],
+                     wait=False)
+        time.sleep(2)
+        code, out, err = self.as_user(["/usr/bin/busctl", "--user", "call", "org.kde.KWin",
+                                       "/Scripting", "org.kde.kwin.Scripting", "loadScript", "ss",
+                                       f"{GUEST_DIR}/kwin_oracle.js", "staros-test-oracle"])
+        script_id = out.split()[-1] if code == 0 and out.split() else None
+        if script_id is not None and script_id != "-1":
+            self.as_user(["/usr/bin/busctl", "--user", "call", "org.kde.KWin",
+                          f"/Scripting/Script{script_id}", "org.kde.kwin.Script", "run"])
+        return script_id, err.strip()
 
     def stop(self):
         if self.agent:
@@ -267,18 +311,8 @@ def find(node, role=None, name=None, description=None):
 
 def run_scenarios(s):
     # S0: the guest agent answers (udev starts it when the port appears).
-    s.agent = qga.GuestAgent(s.qga_socket, timeout=10)
-    deadline = time.monotonic() + 120
-    while True:
-        try:
-            s.agent.connect()
-            s.agent.sync(timeout=10)
-            break
-        except (OSError, qga.GuestAgentError) as err:
-            if time.monotonic() > deadline:
-                s.check("S0", False, f"guest agent did not answer: {err}")
-            time.sleep(3)
-    s.check("S0", True, "guest agent answers")
+    err = s.connect_agent()
+    s.check("S0", err is None, f"guest agent answers{'' if err is None else f': {err}'}")
 
     # S1: session facts seen from inside the guest.
     code, out, _ = s.guest(["/usr/bin/sh", "-c",
@@ -296,21 +330,9 @@ def run_scenarios(s):
     s.record("S1", "INFO", "copy-on-write space: " + " ".join(out.split()))
 
     # S2: helpers, KWin oracle and its listener.
-    for name in HELPERS:
-        with open(os.path.join(HERE, "guest", name), encoding="utf-8") as f:
-            s.agent.write_file(f"{GUEST_DIR}/{name}", f.read(), mode="0644")
-    s.guest(["/usr/bin/chmod", "0755", GUEST_DIR])
-    s.as_user(["/usr/bin/python3", "-I", f"{GUEST_DIR}/oracle_listener.py", ORACLE_FILE],
-              wait=False)
-    time.sleep(2)
-    code, out, err = s.as_user(["/usr/bin/busctl", "--user", "call", "org.kde.KWin",
-                                "/Scripting", "org.kde.kwin.Scripting", "loadScript", "ss",
-                                f"{GUEST_DIR}/kwin_oracle.js", "staros-test-oracle"])
-    script_id = out.split()[-1] if code == 0 and out.split() else None
+    script_id, err = s.install_helpers()
     s.check("S2", script_id is not None and script_id != "-1",
-            f"KWin script loaded (id {script_id}) {err.strip()}")
-    s.as_user(["/usr/bin/busctl", "--user", "call", "org.kde.KWin",
-               f"/Scripting/Script{script_id}", "org.kde.kwin.Script", "run"])
+            f"KWin script loaded (id {script_id}) {err}")
     loaded = s.wait_oracle(lambda e: True, 20, "a first report")
     s.check("S2", True, "KWin oracle reports: " + json.dumps(loaded))
 
@@ -443,6 +465,45 @@ def run_scenarios(s):
     s.check("S16", detail.startswith("Live session: changes are lost at shutdown."),
             f"'System status' says: {detail!r}")
 
+    # S17: Star Lens. Meta+Shift+L is its global shortcut, registered from its
+    # desktop file (informational); when it does not start Star Lens the
+    # launcher does, so the screenshot and the results are checked either way.
+    s.keys("meta_l", "shift", "l")
+    try:
+        report = s.wait_oracle(lambda e: is_active(e, LENS), 20, f"active {LENS}")
+        s.record("S17", "INFO", "Meta+Shift+L started Star Lens")
+    except CheckFailed as err:
+        s.record("S17", "INFO", f"Meta+Shift+L did not start Star Lens ({err}); using the launcher")
+        launch(s, "lens")
+        report = s.wait_oracle(lambda e: is_active(e, LENS), 45, f"active {LENS}")
+    s.check("S17", True, f"Star Lens active per KWin: {json.dumps(report)}")
+    tree = wait_tree(s, "staros-lens", lambda t: find(t, name="Select an area"), 30)
+    with open(os.path.join(s.log_dir, "atspi-lens.json"), "w") as f:
+        json.dump(tree, f, indent=1)
+    s.check("S17", bool(find(tree, name="Select an area")),
+            f"Star Lens has a screenshot and asks to select an area: {named_objects(tree)}")
+    s.screenshot("S17-lens-select")
+    s.keys("ctrl", "a")
+    s.keys("ret")
+    tree = wait_tree(s, "staros-lens", lambda t: find(t, name="Results"), 120)
+    s.check("S17", bool(find(tree, name="Results")),
+            f"Ctrl+A and Return show the 'Results': {named_objects(tree)}")
+    texts = find(tree, name="Recognised text")
+    recognised = (texts[0].get("description") or "") if texts else ""
+    s.record("S17", "INFO", f"recognised text: {recognised[:200]!r}")
+    s.screenshot("S17-lens-results")
+    # Escape returns to selecting; a second Escape closes Star Lens, which
+    # copied nothing and so has nothing to keep serving.
+    s.keys("esc")
+    time.sleep(1)
+    s.keys("esc")
+    deadline = time.monotonic() + 20
+    code = 0
+    while code == 0 and time.monotonic() < deadline:
+        time.sleep(1)
+        code, _, _ = s.guest(["/usr/bin/pgrep", "-x", "staros-lens"])
+    s.check("S17", code == 1, "Escape twice closed Star Lens")
+
     # Informational until each has three consecutive green runs (design spec).
     for scenario in (scenario_scaling, scenario_orca):
         try:
@@ -458,6 +519,18 @@ def launch(s, text):
     s.wait_focus("text", "Search applications")
     s.type_text(text)
     s.keys("ret")
+
+
+def wait_tree(s, app, predicate, seconds):
+    """APP's AT-SPI tree once PREDICATE holds for it, else the last tree."""
+    deadline = time.monotonic() + seconds
+    tree = {}
+    while time.monotonic() < deadline:
+        tree = s.atspi("walk", app, "30")
+        if predicate(tree):
+            break
+        time.sleep(2)
+    return tree
 
 
 def named_objects(tree, limit=40):

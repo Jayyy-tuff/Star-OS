@@ -1,9 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 import QtQuick
 import StarOS.Shell
+import "fileinfo.js" as FileInfo
 
 // One item of the folder contents. A screen reader gets the name and the type
-// (with the size for files); the row shows the same two texts.
+// (with the size for files); the row shows the same two texts, a type icon,
+// and a thumbnail for small local images.
 Item {
     id: row
 
@@ -12,6 +14,10 @@ Item {
     required property var url
     required property bool isDir
     required property string accessibleDescription
+    required property string mimeType
+    required property var size
+
+    readonly property string kind: FileInfo.kindOf(row.mimeType, row.isDir)
 
     signal clicked()
     signal activated()
@@ -45,16 +51,22 @@ Item {
             name: row.name
         }
 
-        // A sheet of paper for files.
-        Rectangle {
-            anchors.centerIn: parent
-            visible: !row.isDir
-            width: Math.round(parent.width * 0.7)
-            height: Math.round(parent.height * 0.9)
-            radius: 2
-            color: "transparent"
-            border.width: 2
-            border.color: Theme.text
+        TypeIcon {
+            anchors.fill: parent
+            visible: !row.isDir && thumbnail.status !== Image.Ready
+            kind: row.kind
+        }
+
+        Image {
+            id: thumbnail
+            objectName: "thumbnail"
+            anchors.fill: parent
+            visible: status === Image.Ready
+            source: !row.isDir && FileInfo.canThumbnail(row.mimeType, row.size, row.url) ? row.url : ""
+            sourceSize: Qt.size(2 * width, 2 * height)
+            asynchronous: true
+            cache: false
+            fillMode: Image.PreserveAspectFit
             Accessible.ignored: true
         }
     }

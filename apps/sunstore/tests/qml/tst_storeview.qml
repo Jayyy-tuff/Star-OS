@@ -45,10 +45,10 @@ Item {
             return -1;
         }
         function categoryIds() {
-            return ["Game", "Utility"];
+            return ["starpicks", "", "Game", "Utility"];
         }
         function categoryName(id) {
-            return id === "Game" ? "Games" : "Utilities";
+            return ({starpicks: "Star picks", "": "All apps", Game: "Games", Utility: "Utilities"})[id];
         }
     }
 
@@ -83,11 +83,24 @@ Item {
         function requestPermissions(appId) { fakeStore.record("permissions:" + appId); }
     }
 
+    QtObject {
+        id: fakeStatus
+
+        property string storageMode: "live"
+    }
+
     StoreView {
         id: view
         anchors.fill: parent
         focus: true
         store: fakeStore
+        status: fakeStatus
+    }
+
+    SignalSpy {
+        id: storageSpy
+        target: view
+        signalName: "storageRequested"
     }
 
     SignalSpy {
@@ -127,6 +140,8 @@ Item {
             fakeStore.state = "ready";
             fakeStore.offline = false;
             fakeStore.calls = [];
+            fakeStatus.storageMode = "live";
+            storageSpy.clear();
             closeSpy.clear();
             view.closeApp();
             view.clearMessage();
@@ -269,6 +284,39 @@ Item {
             verify(!findChild(appPage, "installButton").enabled);
             fakeStore.busy = false;
             verify(findChild(appPage, "installButton").enabled);
+        }
+
+        function test_star_picks_come_first() {
+            const categories = findChild(view, "categories");
+            compare(categories.count, 4);
+            categories.currentIndex = 0;
+            compare(categories.currentItem.Accessible.name, "Star picks");
+            categories.currentIndex = 1;
+            compare(categories.currentItem.Accessible.name, "All apps");
+            categories.forceActiveFocus();
+            categories.currentIndex = 0;
+            keyClick(Qt.Key_Return);
+            compare(fakeApps.category, "starpicks");
+            categories.currentIndex = 1;
+            keyClick(Qt.Key_Return);
+            compare(fakeApps.category, "");
+        }
+
+        function test_storage_banner() {
+            const banner = findChild(view, "storageBanner");
+            const button = findChild(view, "storageButton");
+            verify(banner.visible);
+            compare(banner.text, "Live session: apps you install are removed at shutdown.");
+            compare(banner.Accessible.name, banner.text);
+            verify(button.visible);
+            compare(button.text, "Set up Star Storage");
+            click(button);
+            compare(storageSpy.count, 1);
+            fakeStatus.storageMode = "star-storage";
+            compare(banner.text, "Apps you install are kept on Star Storage.");
+            verify(!button.visible);
+            fakeStatus.storageMode = "installed";
+            verify(!banner.visible);
         }
     }
 }

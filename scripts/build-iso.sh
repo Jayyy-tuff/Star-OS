@@ -34,6 +34,8 @@ boot_title_to='Star OS live (prototype)'
 # boot entry. The live medium's writable layer is a RAM disk of this size, so
 # that per-user Flatpak apps fit (tmpfs only uses memory for written data).
 kernel_params='cow_spacesize=50%'
+# The systemd-boot entry of Star Storage (distro/archiso/staros/boot).
+storage_entry=01-staros-storage-linux.conf
 
 check_host() {
     local want have
@@ -80,6 +82,40 @@ retitle_boot_entries() {
                "renamed $uefi UEFI and $bios BIOS entries; review the releng format before building"
     grep -rn -- "$boot_title_to" "${files[@]}" | sed "s|^$profile/||" >"$build_dir/boot-entries.txt"
     log "Boot menu entries renamed ($uefi UEFI, $bios BIOS)"
+}
+
+# Star Storage (M0.4, ADR-0011): a systemd-boot entry and a syslinux label
+# that keep the live system's changes on the disk labelled STAROS_DATA. The
+# releng entry stays the default.
+add_storage_boot_entries() {
+    local profile=$1
+    local entries="$profile/efiboot/loader/entries" sys="$profile/syslinux/archiso_sys-linux.cfg"
+    [[ -d $entries && -f $sys ]] \
+        || die "expected releng's efiboot/loader/entries and syslinux/archiso_sys-linux.cfg;" \
+               "review the releng format before building"
+    grep -qx 'default 01-archiso-linux.conf' "$profile/efiboot/loader/loader.conf" \
+        || die "expected releng's loader.conf to default to 01-archiso-linux.conf"
+    install -m 0644 -- "$overlay_dir/boot/efiboot/loader/entries/$storage_entry" "$entries/"
+    { printf '\n'; cat -- "$overlay_dir/boot/syslinux/staros-storage.cfg"; } >>"$sys"
+    log "Added the Star Storage boot entries (UEFI $storage_entry, BIOS label starstorage)"
+}
+
+# Checks the built Star Storage entries: one UEFI and one BIOS entry with the
+# label and a per-build folder, all placeholders replaced.
+check_storage_entries() {
+    local work=$1 lines line
+    lines=$(grep -rhE --include='*.cfg' --include='*.conf' --exclude-dir=airootfs \
+        'cow_label=STAROS_DATA' "$work" | sort -u)
+    [[ $(grep -c . <<<"$lines") -eq 2 ]] \
+        || die "expected 2 Star Storage boot entries (UEFI and BIOS), found:" "$lines"
+    ! grep -qE '%[A-Z_]+%' <<<"$lines" \
+        || die "unreplaced placeholders in the Star Storage boot entries:" "$lines"
+    grep -qE 'cow_directory=persistent_[0-9-]+/x86_64( |$)' <<<"$lines" \
+        || die "the Star Storage entries do not name a per-build folder:" "$lines"
+    log "Star Storage boot entries:"
+    while IFS= read -r line; do
+        printf '    %s\n' "$line"
+    done <<<"$lines"
 }
 
 # Arch's flatpak package ships Flathub as a static system-wide remote. Star OS
@@ -211,6 +247,7 @@ assemble_profile() {
     pin_repositories "$profile/pacman.conf"
     add_local_repository "$profile/pacman.conf"
     skip_static_flatpak_remote "$profile/pacman.conf"
+    add_storage_boot_entries "$profile"
     retitle_boot_entries "$profile"
 }
 
@@ -259,6 +296,7 @@ main() {
     mkarchiso -v -w "$work" -o "$out_dir" "$profile"
 
     check_boot_parameters "$work"
+    check_storage_entries "$work"
     log "Disk space after mkarchiso:"
     df -h -- "$build_dir" "$out_dir" | sed 's/^/    /'
     log "Checking the image policy"

@@ -14,10 +14,19 @@ import StarOS.Shell
 //          categoryIds(), categoryName(id)); start(), enableFlathub(),
 //          refresh(), updateAll(); install/remove/open/requestPermissions for
 //          AppPage; the signals operationFinished and operationFailed.
+//   status optional, StarOS.System's SystemStatus (storageMode), for the
+//          banner that says where installed apps are kept.
 FocusScope {
     id: root
 
     required property var store
+    property var status: null
+
+    readonly property string storageMode: root.status ? String(root.status.storageMode) : ""
+    readonly property bool showsStorage: !root.consent && (root.storageMode === "live" || root.storageMode === "star-storage")
+
+    // "Set up Star Storage" in the banner.
+    signal storageRequested()
 
     readonly property var apps: root.store.apps
     readonly property size windowSize: Qt.size(root.width, root.height)
@@ -255,6 +264,51 @@ FocusScope {
         }
     }
 
+    // Where installed apps are kept: on Star Storage, or in memory.
+    GlassSurface {
+        id: bannerGlass
+        x: root.margin
+        y: headerGlass.y + headerGlass.height + root.margin
+        width: root.width - 2 * root.margin
+        height: root.showsStorage ? Theme.minTarget + root.margin / 2 : 0
+        visible: root.showsStorage
+        wallpaperOrigin: Qt.point(x, y)
+        screenSize: root.windowSize
+    }
+
+    Item {
+        anchors.fill: bannerGlass
+        anchors.leftMargin: root.margin
+        anchors.rightMargin: root.margin / 2
+        visible: bannerGlass.visible
+
+        Text {
+            objectName: "storageBanner"
+            anchors.left: parent.left
+            anchors.right: storageButton.visible ? storageButton.left : parent.right
+            anchors.rightMargin: root.margin
+            anchors.verticalCenter: parent.verticalCenter
+            text: root.storageMode === "star-storage" ? qsTr("Apps you install are kept on Star Storage.")
+                                                      : qsTr("Live session: apps you install are removed at shutdown.")
+            color: Theme.text
+            font: Theme.metrics.font
+            elide: Text.ElideRight
+            Accessible.role: Accessible.StaticText
+            Accessible.name: text
+        }
+
+        StoreButton {
+            id: storageButton
+            objectName: "storageButton"
+            anchors.right: parent.right
+            anchors.verticalCenter: parent.verticalCenter
+            visible: root.storageMode === "live"
+            text: qsTr("Set up Star Storage")
+            description: qsTr("Keep your apps, files and settings on a disk")
+            onClicked: root.storageRequested()
+        }
+    }
+
     GlassSurface {
         id: statusGlass
         x: root.margin
@@ -327,7 +381,7 @@ FocusScope {
     GlassSurface {
         id: sidebarGlass
         x: root.margin
-        y: headerGlass.y + headerGlass.height + root.margin
+        y: (bannerGlass.visible ? bannerGlass.y + bannerGlass.height : headerGlass.y + headerGlass.height) + root.margin
         width: root.apps.section === "discover" && root.listed ? Math.round(Math.min(12 * Theme.gridUnit, root.width / 4)) : 0
         height: statusGlass.y - y - root.margin
         visible: width > 0 && !root.consent
@@ -341,7 +395,7 @@ FocusScope {
         anchors.fill: sidebarGlass
         anchors.margins: root.margin / 2
         visible: sidebarGlass.visible
-        model: [""].concat(root.apps.categoryIds())
+        model: root.apps.categoryIds()
         clip: true
         keyNavigationEnabled: true
         highlightMoveDuration: 0
@@ -355,7 +409,7 @@ FocusScope {
             id: categoryRow
             required property int index
             required property string modelData
-            readonly property string label: modelData === "" ? qsTr("All apps") : root.apps.categoryName(modelData)
+            readonly property string label: root.apps.categoryName(modelData)
 
             width: categoryList.width
             height: Theme.minTarget

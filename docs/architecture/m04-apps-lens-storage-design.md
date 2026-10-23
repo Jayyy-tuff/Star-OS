@@ -125,11 +125,13 @@ now cover `StarOS/Shell` only).
 
 - App `/usr/bin/staros-storage`, desktop file `org.staros.storage.desktop`
   ("Star Storage", "Storage Setup"). Shows the mode and usage
-  (`SystemStatus`), any existing Star Storage disk, and the disks that can be
-  used: `lsblk --json --bytes` (type disk, writable, at least 8 GiB, not the
-  boot medium, no mounted partition). Choosing a disk shows model, size,
-  connection and its partitions; the person must type the disk's name (for
-  example `sdb`) before "Erase and set up" is enabled.
+  (`SystemStatus`), any existing Star Storage disk, and the disks from the
+  helper's `list` (run as the person): `lsblk --json --bytes`, whole disks
+  with accepted names, each marked usable (writable, at least 8 GiB, not the
+  boot medium, no mounted partition) or with the reason it is not. Choosing a
+  disk shows model, size, connection and its partitions; the person must type
+  the disk's name (for example `sdb`) before "Erase and set up" is
+  enabled.
 - Privileged helper `/usr/lib/staros/staros-storage-helper` (Python, stdlib
   only), started with `pkexec`. Polkit action `org.staros.storage.manage`
   (`auth_admin_keep`); on the live medium a rule in the overlay allows
@@ -142,9 +144,10 @@ now cover `StarOS/Shell` only).
   - `boot next|always|never` (UEFI only): `bootctl set-oneshot` /
     `set-default` the Star Storage entry, or clear the default.
 - Boot entries (added by `build-iso.sh` from `distro/archiso/staros/boot/`):
-  systemd-boot `01-staros-storage-linux.conf`, a syslinux label and a GRUB
-  menu entry "Star OS live with Star Storage" with
+  systemd-boot `01-staros-storage-linux.conf` and the syslinux label
+  `starstorage`, "Star OS live (prototype) with Star Storage", with
   `cow_label=STAROS_DATA cow_directory=persistent_%ARCHISO_UUID%/%ARCH%`.
+  GRUB is not one of the ISO's boot modes (releng v91), so it has no entry.
   Never the default: archiso waits 30 s and opens an emergency shell when the
   disk is missing. Persistence belongs to one ISO build; a new ISO starts
   with an empty overlay (the old one stays on the disk).
@@ -165,8 +168,11 @@ now cover `StarOS/Shell` only).
   "System status" says "Live session"; S17 Meta+Shift+L opens Star Lens with a
   capture (no permission error) and Ctrl+A, Return shows results (recognised
   text informational).
-- Storage (new job, UEFI, a 10 GiB scratch image, never a real disk): boot 1
-  formats it through `pkexec` and the helper as `liveuser` and sets the next
-  boot; boot 2 runs from Star Storage (`cow_label` on the command line,
-  cowspace on `vdb1`, meter says "Star Storage") and writes a marker file;
-  boot 3 finds the marker.
+- Storage (job `storage-test`, `tests/storage/storage_test.py`, UEFI, a
+  10 GiB scratch image as the only virtio disk `vda`, never a real disk):
+  boot 1 opens Star Storage from the launcher, selects the disk, types `vda`,
+  erases it (pkexec, the live rule, the helper) and uses "Restart into Star
+  Storage"; boot 2 runs from Star Storage (`cow_label` on the command line,
+  cowspace on `vda1`, the meter says "Star Storage"), writes a marker file
+  and switches on "Always start with Star Storage"; boot 3 starts from the
+  default entry and finds the marker.

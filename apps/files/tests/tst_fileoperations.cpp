@@ -64,6 +64,7 @@ private Q_SLOTS:
     void refusesToStartPrograms();
     void neverRunsDesktopEntries();
     void refusesToOpenItemsInTheTrash();
+    void opensTerminalInLocalFolders();
 
 private:
     struct Outcome {
@@ -404,6 +405,25 @@ void FileOperationsTest::refusesToOpenItemsInTheTrash()
     m_operations->open(QUrl(QStringLiteral("trash:/0-file.txt")));
     QCOMPARE(failed.count(), 1);
     QVERIFY(!m_operations->isBusy());
+}
+
+void FileOperationsTest::opensTerminalInLocalFolders()
+{
+    // A harmless program stands in for Konsole.
+    m_operations->setTerminalProgram(QStringLiteral("/usr/bin/true"));
+    QSignalSpy failed(m_operations.get(), &FileOperations::failed);
+    QVERIFY(m_operations->openTerminal(urlOf(QString())));
+    QCOMPARE(failed.count(), 0);
+
+    QVERIFY(writeFile(pathOf(QStringLiteral("file.txt"))));
+    QVERIFY(!m_operations->openTerminal(urlOf(QStringLiteral("file.txt"))));
+    QVERIFY(!m_operations->openTerminal(QUrl(QStringLiteral("trash:/"))));
+    QCOMPARE(failed.count(), 2);
+    QCOMPARE(failed.first().at(0).toString(), QStringLiteral("terminal"));
+
+    m_operations->setTerminalProgram(QStringLiteral("/nonexistent/terminal"));
+    QVERIFY(!m_operations->openTerminal(urlOf(QString())));
+    QCOMPARE(failed.last().at(1).toString(), QStringLiteral("The terminal could not be started."));
 }
 
 QTEST_MAIN(FileOperationsTest)

@@ -1,12 +1,14 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
-# Star OS Files (M0.3). Built in CI by scripts/build-packages.sh from a
-# tarball of the checked-out repository (ADR-0009). The version is fixed and
-# bumped in reviewed changes, so the ISO's package manifest stays stable.
-# At run time the QML module StarOS.Shell comes from the ISO's shell tree
-# (/usr/lib/qt6/qml/StarOS/Shell), which no package owns yet.
+# Star OS Files (M0.3; sorting, type icons, storage panel and Open Terminal in
+# M0.4). Built in CI by scripts/build-packages.sh from a tarball of the
+# checked-out repository (ADR-0009). The version is fixed and bumped in
+# reviewed changes, so the ISO's package manifest stays stable. At run time
+# the QML module StarOS.Shell comes from the ISO's shell tree
+# (/usr/lib/qt6/qml/StarOS/Shell), which no package owns yet; StarOS.System
+# comes from staros-system.
 
 pkgname=staros-files
-pkgver=0.3.0
+pkgver=0.4.0
 pkgrel=1
 pkgdesc='Star OS file manager'
 arch=(x86_64)
@@ -23,6 +25,7 @@ depends=(
   qt6-base
   qt6-declarative
   qt6-svg
+  staros-system
 )
 makedepends=(
   cmake

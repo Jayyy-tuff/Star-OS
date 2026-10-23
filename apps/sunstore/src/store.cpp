@@ -5,6 +5,7 @@
 #include "flatpakoutput.h"
 
 #include <QDir>
+#include <QProcess>
 #include <QStandardPaths>
 #include <QSysInfo>
 
@@ -280,6 +281,11 @@ bool Store::open(const QString &appId)
         return false;
     }
     return m_cli->startDetached({QStringLiteral("run"), appId});
+}
+
+bool Store::openStarStorage()
+{
+    return QProcess::startDetached(QStringLiteral("/usr/bin/staros-storage"), {});
 }
 
 void Store::requestPermissions(const QString &appId)

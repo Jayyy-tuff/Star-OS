@@ -207,17 +207,17 @@ overlay_paths_unowned() {
 
 star_os_apps_installed() {
     local pkg app
-    for pkg in staros-files staros-sunstore; do
+    for pkg in staros-files staros-sunstore staros-lens staros-storage; do
         pacman_root -Q "$pkg" >/dev/null 2>&1 || { echo "    $pkg is not installed"; return 1; }
     done
-    for app in staros-files staros-sunstore; do
+    for app in staros-files staros-sunstore staros-lens staros-storage; do
         [[ -x $root/usr/bin/$app ]] || { echo "    /usr/bin/$app is missing"; return 1; }
     done
 }
 
 app_entries_valid() {
     local entry
-    for entry in org.staros.files org.staros.sunstore; do
+    for entry in org.staros.files org.staros.sunstore org.staros.lens org.staros.storage; do
         desktop-file-validate "$root/usr/share/applications/$entry.desktop" \
             || { echo "    $entry.desktop is not valid"; return 1; }
     done
@@ -226,8 +226,8 @@ app_entries_valid() {
 # Desktop files of the launcher's catalogue (AppCatalogue.qml) that the
 # image must have, so a renamed desktop file is noticed.
 catalogue_apps=(
-    org.kde.konsole systemsettings org.staros.files org.staros.sunstore
-    firefox vlc org.kde.okular org.kde.gwenview org.kde.ark org.kde.kwrite org.kde.kcalc
+    org.kde.konsole systemsettings org.staros.files org.staros.sunstore org.staros.lens
+    org.staros.storage firefox vlc org.kde.okular org.kde.gwenview org.kde.ark org.kde.kwrite org.kde.kcalc
 )
 
 catalogue_apps_present() {
@@ -244,6 +244,39 @@ catalogue_apps_present() {
 star_os_system_module() {
     [[ -f $root/usr/lib/qt6/qml/StarOS/System/qmldir ]] \
         && [[ $(pacman_root -Qqo "$root/usr/lib/qt6/qml/StarOS/System/qmldir" 2>/dev/null) == staros-system ]]
+}
+
+# KWin grants its screenshot interface to the program named by an absolute
+# Exec in a desktop file that lists the interface (ADR-0012); English text
+# recognition data must be there.
+lens_screenshot_grant() {
+    local file="$root/usr/share/applications/org.staros.lens.desktop"
+    grep -qx 'Exec=/usr/bin/staros-lens' "$file" \
+        && grep -qx 'X-KDE-DBUS-Restricted-Interfaces=org.kde.KWin.ScreenShot2' "$file" \
+        && grep -qx 'X-KDE-Shortcuts=Meta+Shift+L' "$file" \
+        && [[ -f $root/usr/share/tessdata/eng.traineddata ]]
+}
+
+# Star Storage (ADR-0011): the helper is root's only through the polkit action
+# that names it; the live rule allows only that action, only for liveuser.
+storage_helper_and_polkit() {
+    local helper=usr/lib/staros/staros-storage-helper
+    local policy=usr/share/polkit-1/actions/org.staros.storage.policy
+    local rule=etc/polkit-1/rules.d/49-staros-live-storage.rules
+    [[ -x $root/$helper && $(stat -c '%U:%G %a' "$root/$helper") == 'root:root 755' ]] \
+        || { echo "    /$helper is missing or not root:root 755"; return 1; }
+    [[ $(pacman_root -Qqo "$root/$helper" 2>/dev/null) == staros-storage ]] \
+        || { echo "    /$helper is not owned by staros-storage"; return 1; }
+    if ! grep -q '<allow_active>auth_admin_keep</allow_active>' "$root/$policy" \
+        || ! grep -q "<annotate key=\"org.freedesktop.policykit.exec.path\">/$helper</annotate>" "$root/$policy"; then
+        echo "    /$policy does not require an administrator for /$helper"
+        return 1
+    fi
+    if [[ $(grep -c 'polkit.Result.YES' "$root/$rule") -ne 1 ]] \
+        || ! grep -q 'action.id === "org.staros.storage.manage" && subject.user === "liveuser"' "$root/$rule"; then
+        echo "    /$rule allows more than the Star Storage action for liveuser"
+        return 1
+    fi
 }
 
 flathub_file_shipped() {
@@ -297,8 +330,10 @@ check "staros.desktop passes desktop-file-validate (DesktopNames allowed)" sessi
 check "Star OS shell files are installed" shell_files_present
 check "no org.kde.plasma.private import in Star OS shell files" no_private_plasma_imports
 check "overlay and shell paths are unowned or package backup files" overlay_paths_unowned
-check "staros-files and staros-sunstore are installed" star_os_apps_installed
-check "Files and Sun Store desktop entries pass desktop-file-validate" app_entries_valid
+check "staros-files, -sunstore, -lens and -storage are installed" star_os_apps_installed
+check "Files, Sun Store, Star Lens and Star Storage desktop entries pass desktop-file-validate" app_entries_valid
+check "the Star Storage helper is root's only through its polkit action" storage_helper_and_polkit
+check "Star Lens has KWin's screenshot grant, its shortcut and English OCR data" lens_screenshot_grant
 check "staros-sunstore ships Flathub's remote file" flathub_file_shipped
 check "the launcher's catalogue apps have their desktop files" catalogue_apps_present
 check "StarOS.System is installed by staros-system" star_os_system_module

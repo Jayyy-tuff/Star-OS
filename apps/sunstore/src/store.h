@@ -63,6 +63,8 @@ public:
     Q_INVOKABLE bool remove(const QString &appId);
     Q_INVOKABLE bool updateAll();
     Q_INVOKABLE bool open(const QString &appId);
+    // Starts Star Storage, where apps can be kept beyond the live session.
+    Q_INVOKABLE bool openStarStorage();
     // Answers with permissionsReady or permissionsFailed.
     Q_INVOKABLE void requestPermissions(const QString &appId);
 

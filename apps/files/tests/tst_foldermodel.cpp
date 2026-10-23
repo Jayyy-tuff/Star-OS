@@ -12,6 +12,8 @@
 #include <QTemporaryDir>
 #include <QTest>
 
+#include <chrono>
+#include <filesystem>
 #include <memory>
 
 namespace
@@ -53,6 +55,8 @@ private Q_SLOTS:
     void refreshAppliesChanges();
     void missingFolderReportsAnError();
     void urlHelpers();
+    void sortsBySizeAndTime();
+    void reportsFreeSpace();
 
 private:
     QUrl urlOf(const QString &name) const;
@@ -223,6 +227,48 @@ void FolderModelTest::urlHelpers()
     QCOMPARE(model.urlFromLocation(QStringLiteral("file:///tmp")), QUrl::fromLocalFile(QStringLiteral("/tmp")));
     QCOMPARE(model.urlFromLocation(QStringLiteral("https://example.org/")), QUrl());
     QCOMPARE(model.urlFromLocation(QString()), QUrl());
+}
+
+void FolderModelTest::sortsBySizeAndTime()
+{
+    // Times modified, set before listing: folders and files of known ages.
+    const auto now = std::filesystem::file_time_type::clock::now();
+    const auto age = [&](const QString &name, int hours) {
+        std::filesystem::last_write_time(QFile::encodeName(QDir(m_dir->path()).filePath(name)).toStdString(),
+                                         now - std::chrono::hours(hours));
+    };
+    age(QStringLiteral("Alpha"), 1);
+    age(QStringLiteral("zeta"), 5);
+    age(QStringLiteral("c"), 1);
+    age(QStringLiteral("b.txt"), 2);
+    age(QStringLiteral("A.txt"), 3);
+
+    FolderModel model;
+    QSignalSpy sorted(&model, &FolderModel::sortKeyChanged);
+    QVERIFY(openAndWait(model, QUrl::fromLocalFile(m_dir->path())));
+
+    // Folders stay first; files by size, largest first, then by name.
+    model.setSortKey(FolderModel::SortBySize);
+    QCOMPARE(model.sortKey(), int(FolderModel::SortBySize));
+    QCOMPARE(sorted.count(), 1);
+    QCOMPARE(names(model), QStringList({"Alpha", "zeta", "b.txt", "A.txt", "c"}));
+
+    // By time modified, newest first, folders among themselves too.
+    model.setSortKey(FolderModel::SortByModified);
+    QCOMPARE(names(model), QStringList({"Alpha", "zeta", "c", "b.txt", "A.txt"}));
+
+    model.setSortKey(FolderModel::SortByName);
+    QCOMPARE(names(model), QStringList({"Alpha", "zeta", "A.txt", "b.txt", "c"}));
+    // Out-of-range keys are clamped.
+    model.setSortKey(7);
+    QCOMPARE(model.sortKey(), int(FolderModel::SortByModified));
+}
+
+void FolderModelTest::reportsFreeSpace()
+{
+    FolderModel model;
+    QVERIFY(openAndWait(model, QUrl::fromLocalFile(m_dir->path())));
+    QVERIFY2(model.freeText().endsWith(QStringLiteral(" free")), qPrintable(model.freeText()));
 }
 
 QTEST_MAIN(FolderModelTest)

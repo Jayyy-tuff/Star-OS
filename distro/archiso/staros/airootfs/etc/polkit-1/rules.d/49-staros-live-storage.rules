@@ -1,0 +1,11 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Live medium only (ADR-0011); the Phase 2 installer must not copy this file.
+// The live user may already use sudo without a password (10-staros-live), so
+// running the Star Storage helper without one gives it nothing new. Elsewhere
+// the helper's polkit action asks for an administrator.
+polkit.addRule(function (action, subject) {
+    if (action.id === "org.staros.storage.manage" && subject.user === "liveuser"
+        && subject.local && subject.active) {
+        return polkit.Result.YES;
+    }
+});

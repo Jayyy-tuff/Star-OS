@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 import QtQuick
 import StarOS.Shell
+import StarOS.System
 
 // The Files window. main.cpp sets initialUrl from the command line; empty
 // means the home folder. The window title ("Files — <folder>") is also its
@@ -30,6 +31,10 @@ Window {
         id: fileOperations
     }
 
+    SystemStatus {
+        id: systemStatus
+    }
+
     FilesView {
         id: view
         anchors.fill: parent
@@ -37,6 +42,7 @@ Window {
         folderModel: currentFolder
         places: placeList
         operations: fileOperations
+        status: systemStatus
     }
 
     Component.onCompleted: {

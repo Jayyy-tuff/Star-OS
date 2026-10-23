@@ -24,7 +24,7 @@ qt_add_qml_module(staros_sunstore_ui
     CLASS_NAME StarOS_SunStorePlugin
     IMPORT_PATH ${STAROS_SHELL_QML_DIR}
     SOURCES
-        appsmodel.cpp appsmodel.h
+        appsmodel.cpp appsmodel.h starpicks.h
         appstream.cpp appstream.h
         flatpakcli.cpp flatpakcli.h
         flatpakoutput.cpp flatpakoutput.h

@@ -1,0 +1,284 @@
+#!/usr/bin/python3 -I
+# SPDX-License-Identifier: GPL-3.0-or-later
+"""Star Storage helper (M0.4, ADR-0011).
+
+  staros-storage-helper list
+      The disks as JSON, and whether each can become Star Storage. Needs no
+      privileges; the Star Storage app shows what it prints.
+  staros-storage-helper format NAME CONFIRM          (as root, via pkexec)
+      Erases disk NAME and makes one ext4 partition labelled STAROS_DATA.
+      CONFIRM is the name again, as the person typed it. Prints JSON lines;
+      the last one is {"done": true, ...} or {"error": "..."}.
+  staros-storage-helper boot next|always|never       (as root, via pkexec)
+      UEFI with Star OS's own boot menu only: start the "with Star Storage"
+      entry at the next start, at every start, or no longer by default.
+
+The helper trusts nothing it is given. It reads the disks itself and refuses
+anything the app would not offer: the Star OS medium, disks in use, read-only
+or smaller than 8 GiB, a second Star Storage disk, and names other than
+sd*, vd*, xvd*, nvme*n* and mmcblk*. Tools run from /usr/bin without a shell.
+"""
+
+import json
+import os
+import re
+import subprocess
+import sys
+import time
+
+LABEL = "STAROS_DATA"
+# The systemd-boot entry that scripts/build-iso.sh adds to the ISO.
+ENTRY = "01-staros-storage-linux.conf"
+MIN_BYTES = 8 * 1024 ** 3
+NAME = re.compile(r"(sd[a-z]{1,3}|vd[a-z]{1,3}|xvd[a-z]{1,3}|nvme[0-9]{1,3}n[0-9]{1,3}|mmcblk[0-9]{1,3})")
+LINUX_DATA = "0FC63DAF-8483-4772-8E79-3D69D8477DE4"
+LOADER_GUID = "4a67b082-0a4c-41cf-b6c7-440b29bb8c4f"
+COWSPACE = "/run/archiso/cowspace"
+LSBLK_COLUMNS = "NAME,PATH,TYPE,SIZE,RO,RM,TRAN,VENDOR,MODEL,FSTYPE,LABEL,UUID,MOUNTPOINTS"
+BIN = "/usr/bin/"
+ENV = {"PATH": "/usr/bin", "LC_ALL": "C"}
+
+REASONS = {
+    "medium": "This is the Star OS medium.",
+    "star-storage-in-use": "Star OS is using this Star Storage now.",
+    "mounted": "It is in use: one of its partitions is mounted.",
+    "read-only": "It is read-only.",
+    "too-small": "It is smaller than 8 GiB.",
+}
+
+
+class Refused(Exception):
+    """A request the helper does not carry out; the message is for people."""
+
+
+def run(argv, stdin=None):
+    """Runs a tool and returns its output; a failure becomes Refused."""
+    result = subprocess.run(argv, input=stdin, capture_output=True, text=True, env=ENV,
+                            timeout=900, check=False)
+    if result.returncode != 0:
+        detail = (result.stderr or result.stdout).strip()[-300:]
+        raise Refused(f"{os.path.basename(argv[0])} failed: {detail}")
+    return result.stdout
+
+
+def flag(value):
+    return value in (True, 1, "1", "true")
+
+
+def nodes(device):
+    """The device and everything on it."""
+    yield device
+    for child in device.get("children") or []:
+        yield from nodes(child)
+
+
+def mountpoints(node):
+    return [m for m in node.get("mountpoints") or [] if m]
+
+
+def kernel_args(cmdline):
+    args = {}
+    for word in cmdline.split():
+        key, _, value = word.partition("=")
+        args[key] = value
+    return args
+
+
+def model_name(device):
+    vendor = (device.get("vendor") or "").strip()
+    model = " ".join((device.get("model") or "").split())
+    if not vendor or vendor == "ATA" or model.lower().startswith(vendor.lower()):
+        return model
+    return f"{vendor} {model}".strip()
+
+
+def describe(device, medium_uuid):
+    """One disk as the app shows it, with why it cannot be used, if not."""
+    inside = list(nodes(device))
+    mounts = [m for node in inside for m in mountpoints(node)]
+    size = int(device.get("size") or 0)
+    if any(n.get("fstype") == "iso9660" or (medium_uuid and n.get("uuid") == medium_uuid)
+           for n in inside):
+        reason = "medium"
+    elif COWSPACE in mounts:
+        reason = "star-storage-in-use"
+    elif mounts:
+        reason = "mounted"
+    elif flag(device.get("ro")):
+        reason = "read-only"
+    elif size < MIN_BYTES:
+        reason = "too-small"
+    else:
+        reason = ""
+    return {
+        "name": device["name"],
+        "path": device.get("path") or "/dev/" + device["name"],
+        "model": model_name(device),
+        "size": size,
+        "transport": device.get("tran") or "",
+        "removable": flag(device.get("rm")),
+        "usable": reason == "",
+        "reason": reason,
+        "reasonText": REASONS.get(reason, ""),
+        "starStorage": any(node.get("label") == LABEL for node in inside),
+        "partitions": [
+            {
+                "name": child["name"],
+                "path": child.get("path") or "/dev/" + child["name"],
+                "size": int(child.get("size") or 0),
+                "fstype": child.get("fstype") or "",
+                "label": child.get("label") or "",
+            }
+            for child in device.get("children") or []
+        ],
+    }
+
+
+def list_disks(devices, cmdline):
+    """Whole disks with a name Star Storage accepts, described."""
+    medium = kernel_args(cmdline).get("archisosearchuuid", "")
+    return [describe(d, medium) for d in devices
+            if d.get("type") == "disk" and NAME.fullmatch(d.get("name") or "")]
+
+
+def efi_state(efi_dir="/sys/firmware/efi"):
+    """UEFI or not, whether systemd-boot started Star OS (None: unknown),
+    and the default boot entry systemd-boot was given."""
+    def variable(name):
+        try:
+            with open(os.path.join(efi_dir, "efivars", f"{name}-{LOADER_GUID}"), "rb") as f:
+                return f.read()[4:].decode("utf-16-le").rstrip("\0")
+        except FileNotFoundError:
+            return ""
+        except (OSError, UnicodeDecodeError):
+            return None
+
+    uefi = os.path.isdir(efi_dir)
+    info = variable("LoaderInfo") if uefi else ""
+    default = variable("LoaderEntryDefault") if uefi else ""
+    return {
+        "uefi": uefi,
+        "systemdBoot": None if info is None else info.startswith("systemd-boot"),
+        "default": default or "",
+    }
+
+
+def list_command(devices, cmdline, efi):
+    disks = list_disks(devices, cmdline)
+    return {
+        "disks": disks,
+        "existing": [d["name"] for d in disks if d["starStorage"]],
+        "uefi": efi["uefi"],
+        "systemdBoot": efi["systemdBoot"],
+        "always": efi["default"] == ENTRY,
+    }
+
+
+def partition_path(disk_path):
+    return disk_path + ("p1" if disk_path[-1].isdigit() else "1")
+
+
+def emit(**fields):
+    print(json.dumps(fields), flush=True)
+
+
+def format_disk(name, confirm, devices, cmdline, run=run, emit=emit,
+                exists=os.path.exists, sleep=time.sleep):
+    if not NAME.fullmatch(name):
+        raise Refused(f"{name!r} is not a disk name Star Storage accepts.")
+    if confirm != name:
+        raise Refused(f"The confirmation {confirm!r} is not the disk's name {name!r}.")
+    disks = {d["name"]: d for d in list_disks(devices, cmdline)}
+    disk = disks.get(name)
+    if disk is None:
+        raise Refused(f"There is no disk {name}.")
+    if not disk["usable"]:
+        raise Refused(f"{name} cannot be used. {disk['reasonText']}")
+    others = [d["name"] for d in disks.values() if d["starStorage"] and d["name"] != name]
+    if others:
+        raise Refused(f"{others[0]} already has Star Storage. Star OS uses one Star Storage disk; "
+                      f"erase {others[0]} or take it out first.")
+
+    emit(step="wipe", message=f"Erasing {name}")
+    for part in disk["partitions"]:
+        run([BIN + "wipefs", "--all", "--quiet", part["path"]])
+    run([BIN + "wipefs", "--all", "--quiet", disk["path"]])
+
+    emit(step="partition", message=f"Making a partition on {name}")
+    run([BIN + "sfdisk", "--quiet", "--wipe", "always", "--wipe-partitions", "always", disk["path"]],
+        stdin=f"label: gpt\ntype={LINUX_DATA}, name={LABEL}\n")
+    run([BIN + "udevadm", "settle", "--timeout=30"])
+    partition = partition_path(disk["path"])
+    for _ in range(30):
+        if exists(partition):
+            break
+        sleep(0.5)
+    else:
+        raise Refused(f"{partition} did not appear.")
+
+    emit(step="format", message=f"Formatting {partition}")
+    run([BIN + "mkfs.ext4", "-F", "-q", "-m", "0", "-L", LABEL, partition])
+    run([BIN + "udevadm", "settle", "--timeout=30"])
+
+    emit(step="verify", message="Checking the new Star Storage")
+    label = run([BIN + "blkid", "-p", "-o", "value", "-s", "LABEL", partition]).strip()
+    if label != LABEL:
+        raise Refused(f"{partition} has the label {label!r} instead of {LABEL}.")
+    return {"done": True, "disk": name, "partition": partition, "label": LABEL}
+
+
+def boot(mode, efi, run=run):
+    verbs = {"next": ["set-oneshot", ENTRY], "always": ["set-default", ENTRY],
+             "never": ["set-default", ""]}
+    if mode not in verbs:
+        raise Refused(f"{mode!r} is not next, always or never.")
+    if not efi["uefi"]:
+        raise Refused("This computer started Star OS without UEFI. Choose \"Star OS live "
+                      "(prototype) with Star Storage\" in the boot menu instead.")
+    if efi["systemdBoot"] is False:
+        raise Refused("Star OS was not started from its own boot menu, so it cannot choose "
+                      "the next start.")
+    run([BIN + "bootctl", *verbs[mode]])
+    return {"done": True, "boot": mode}
+
+
+def read_devices():
+    data = json.loads(run([BIN + "lsblk", "--json", "--bytes", "--output", LSBLK_COLUMNS]))
+    return data.get("blockdevices") or []
+
+
+def read_cmdline():
+    with open("/proc/cmdline", encoding="utf-8") as f:
+        return f.read()
+
+
+def require_root():
+    if os.geteuid() != 0:
+        raise Refused("This needs to run as root, through pkexec.")
+
+
+def main(argv):
+    try:
+        if len(argv) == 2 and argv[1] == "list":
+            emit(**list_command(read_devices(), read_cmdline(), efi_state()))
+            return 0
+        if len(argv) == 4 and argv[1] == "format":
+            require_root()
+            emit(**format_disk(argv[2], argv[3], read_devices(), read_cmdline()))
+            return 0
+        if len(argv) == 3 and argv[1] == "boot":
+            require_root()
+            emit(**boot(argv[2], efi_state()))
+            return 0
+    except Refused as err:
+        emit(error=str(err))
+        return 1
+    except (OSError, ValueError, subprocess.SubprocessError) as err:
+        emit(error=f"Star Storage failed: {err}")
+        return 1
+    print(__doc__, file=sys.stderr)
+    return 2
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv))

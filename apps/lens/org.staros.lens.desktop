@@ -1,0 +1,16 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Exec is absolute: KWin grants org.kde.KWin.ScreenShot2 to the process whose
+# executable matches the Exec of a desktop file listing that interface.
+[Desktop Entry]
+Type=Application
+Name=Star Lens
+GenericName=Text and Code Scanner
+Comment=Select an area of the screen to read its text, QR codes and barcodes
+Exec=/usr/bin/staros-lens
+Icon=edit-find
+Terminal=false
+Categories=Qt;Utility;
+Keywords=lens;ocr;text;qr;barcode;scan;screenshot;search;
+StartupNotify=false
+X-KDE-DBUS-Restricted-Interfaces=org.kde.KWin.ScreenShot2
+X-KDE-Shortcuts=Meta+Shift+L

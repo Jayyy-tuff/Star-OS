@@ -6,6 +6,7 @@
 #include <KIO/Job>
 
 #include <QDir>
+#include <QStorageInfo>
 
 #include <algorithm>
 #include <iterator>
@@ -16,11 +17,8 @@ namespace
 // model reset instead of a row insertion each.
 constexpr qsizetype BatchResetThreshold = 16;
 
-bool lessThan(const KFileItem &a, const KFileItem &b)
+bool byName(const KFileItem &a, const KFileItem &b)
 {
-    if (a.isDir() != b.isDir()) {
-        return a.isDir();
-    }
     const QString textA = a.text();
     const QString textB = b.text();
     const int order = QString::compare(textA, textB, Qt::CaseInsensitive);
@@ -56,6 +54,7 @@ FolderModel::FolderModel(QObject *parent)
     });
     connect(m_lister, &KCoreDirLister::completed, this, [this] {
         setLoading(false);
+        updateFreeText();
         Q_EMIT listingFinished();
     });
     connect(m_lister, &KCoreDirLister::canceled, this, [this] {
@@ -154,6 +153,7 @@ void FolderModel::setUrl(const QUrl &url)
     m_url = target;
     setErrorString(QString());
     Q_EMIT urlChanged();
+    updateFreeText();
     // Emits clear() first, which empties the rows.
     m_lister->openUrl(m_url);
 }
@@ -297,9 +297,67 @@ int FolderModel::rowOfUrl(const QList<KFileItem> &items, const QUrl &url) const
     return it == items.cend() ? -1 : int(it - items.cbegin());
 }
 
+bool FolderModel::lessThan(const KFileItem &a, const KFileItem &b) const
+{
+    if (a.isDir() != b.isDir()) {
+        return a.isDir();
+    }
+    // Folders have no size of their own; they stay in name order.
+    if (m_sortKey == SortBySize && !a.isDir() && a.size() != b.size()) {
+        return a.size() > b.size();
+    }
+    if (m_sortKey == SortByModified) {
+        const QDateTime timeA = a.time(KFileItem::ModificationTime);
+        const QDateTime timeB = b.time(KFileItem::ModificationTime);
+        if (timeA != timeB) {
+            return timeA > timeB;
+        }
+    }
+    return byName(a, b);
+}
+
+int FolderModel::sortKey() const
+{
+    return m_sortKey;
+}
+
+void FolderModel::setSortKey(int key)
+{
+    const int clamped = std::clamp(key, int(SortByName), int(SortByModified));
+    if (clamped == m_sortKey) {
+        return;
+    }
+    m_sortKey = clamped;
+    rebuild();
+    Q_EMIT sortKeyChanged();
+}
+
+QString FolderModel::freeText() const
+{
+    return m_freeText;
+}
+
+void FolderModel::updateFreeText()
+{
+    QString text;
+    if (m_url.isLocalFile()) {
+        const QStorageInfo storage(m_url.toLocalFile());
+        if (storage.isValid() && storage.isReady()) {
+            text = tr("%1 free").arg(KIO::convertSize(KIO::filesize_t(qMax<qint64>(0, storage.bytesAvailable()))));
+        }
+    }
+    if (text != m_freeText) {
+        m_freeText = text;
+        Q_EMIT freeTextChanged();
+    }
+}
+
 int FolderModel::insertionRow(const KFileItem &item) const
 {
-    return int(std::upper_bound(m_items.cbegin(), m_items.cend(), item, lessThan) - m_items.cbegin());
+    const auto less = [this](const KFileItem &a, const KFileItem &b) {
+        return lessThan(a, b);
+    };
+    return int(std::upper_bound(m_items.cbegin(), m_items.cend(), item, less) - m_items.cbegin());
 }
 
 void FolderModel::insertItem(const KFileItem &item)
@@ -317,7 +375,9 @@ void FolderModel::rebuild()
     std::copy_if(m_all.cbegin(), m_all.cend(), std::back_inserter(m_items), [this](const KFileItem &item) {
         return accepts(item);
     });
-    std::sort(m_items.begin(), m_items.end(), lessThan);
+    std::sort(m_items.begin(), m_items.end(), [this](const KFileItem &a, const KFileItem &b) {
+        return lessThan(a, b);
+    });
     endResetModel();
 }
 

@@ -42,6 +42,9 @@ gwenview
 ark
 kwrite
 kcalc
-# Offline text recognition for Star Lens.
+# Star Storage (persistent live disk) and Star Lens with its offline text
+# recognition.
+staros-storage
+staros-lens
 tesseract
 tesseract-data-eng

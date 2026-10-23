@@ -18,9 +18,10 @@ class Job;
 }
 
 // One folder's contents, listed and watched by KCoreDirLister. Rows are sorted
-// folders first, then by name ignoring case. The lister applies the hidden-file
-// setting; the name filter (a case-insensitive substring) is applied here so
-// that it also matches folders and partial names.
+// folders first, then by name ignoring case, by size (largest first) or by the
+// time modified (newest first). The lister applies the hidden-file setting;
+// the name filter (a case-insensitive substring) is applied here so that it
+// also matches folders and partial names.
 class FolderModel : public QAbstractListModel
 {
     Q_OBJECT
@@ -35,6 +36,10 @@ class FolderModel : public QAbstractListModel
     Q_PROPERTY(int count READ count NOTIFY countChanged)
     Q_PROPERTY(bool loading READ isLoading NOTIFY loadingChanged)
     Q_PROPERTY(QString errorString READ errorString NOTIFY errorStringChanged)
+    // A SortKey value: 0 name, 1 size, 2 modified.
+    Q_PROPERTY(int sortKey READ sortKey WRITE setSortKey NOTIFY sortKeyChanged)
+    // "9.8 GiB free" for a local folder, empty elsewhere (Trash).
+    Q_PROPERTY(QString freeText READ freeText NOTIFY freeTextChanged)
 
 public:
     enum Role {
@@ -49,6 +54,13 @@ public:
         AccessibleDescriptionRole,
     };
     Q_ENUM(Role)
+
+    enum SortKey {
+        SortByName = 0,
+        SortBySize,
+        SortByModified,
+    };
+    Q_ENUM(SortKey)
 
     explicit FolderModel(QObject *parent = nullptr);
     ~FolderModel() override;
@@ -69,6 +81,9 @@ public:
     int count() const;
     bool isLoading() const;
     QString errorString() const;
+    int sortKey() const;
+    void setSortKey(int key);
+    QString freeText() const;
 
     KFileItem itemAt(int row) const;
 
@@ -92,11 +107,15 @@ Q_SIGNALS:
     void countChanged();
     void loadingChanged();
     void errorStringChanged();
+    void sortKeyChanged();
+    void freeTextChanged();
     // The lister finished (completed or canceled) a listing or an update.
     void listingFinished();
 
 private:
     bool accepts(const KFileItem &item) const;
+    bool lessThan(const KFileItem &a, const KFileItem &b) const;
+    void updateFreeText();
     int rowOfUrl(const QList<KFileItem> &items, const QUrl &url) const;
     int insertionRow(const KFileItem &item) const;
     void insertItem(const KFileItem &item);
@@ -115,4 +134,6 @@ private:
     QList<KFileItem> m_items; // the rows: m_all filtered and sorted
     bool m_loading = false;
     QString m_errorString;
+    int m_sortKey = SortByName;
+    QString m_freeText;
 };

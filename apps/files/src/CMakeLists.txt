@@ -16,6 +16,8 @@ set(qml_files
     qml/Main.qml
     qml/NameDialog.qml
     qml/PlaceRow.qml
+    qml/TypeIcon.qml
+    qml/fileinfo.js
 )
 # Keep the QML files at the module root in the resources (no qml/ prefix).
 foreach(qml_file IN LISTS qml_files)

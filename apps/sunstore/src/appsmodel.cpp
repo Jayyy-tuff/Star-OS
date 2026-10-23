@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "appsmodel.h"
 
+#include "starpicks.h"
+
 #include <QCollator>
 #include <QPair>
 #include <QUrl>
@@ -225,7 +227,11 @@ bool AppsModel::matches(const Entry &entry) const
         if (!entry.inCatalogue) {
             return false;
         }
-        if (!m_category.isEmpty() && !entry.app.categories.contains(m_category)) {
+        if (m_category == StarPicks::CategoryId) {
+            if (!StarPicks::AppIds.contains(entry.app.id)) {
+                return false;
+            }
+        } else if (!m_category.isEmpty() && !entry.app.categories.contains(m_category)) {
             return false;
         }
     }
@@ -287,7 +293,7 @@ int AppsModel::indexOf(const QString &appId) const
 
 QStringList AppsModel::categoryIds() const
 {
-    QStringList ids;
+    QStringList ids{StarPicks::CategoryId, QString()};
     for (const auto &category : Categories) {
         ids.append(category.first);
     }
@@ -296,6 +302,12 @@ QStringList AppsModel::categoryIds() const
 
 QString AppsModel::categoryName(const QString &id) const
 {
+    if (id == StarPicks::CategoryId) {
+        return tr("Star picks");
+    }
+    if (id.isEmpty()) {
+        return tr("All apps");
+    }
     for (const auto &category : Categories) {
         if (category.first == id) {
             return tr(category.second);

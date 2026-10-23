@@ -1,0 +1,12 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+[Desktop Entry]
+Type=Application
+Name=Star Storage
+GenericName=Storage Setup
+Comment=Keep your files, settings and apps on a disk when Star OS runs live
+Exec=staros-storage
+Icon=drive-harddisk
+Terminal=false
+Categories=Qt;System;
+Keywords=storage;persistence;persistent;disk;usb;save;keep;
+StartupNotify=true

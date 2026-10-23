@@ -1,0 +1,56 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Star Lens (M0.4, ADR-0012): reads text, QR codes and barcodes in an area of
+# the screen, offline. Built in CI by scripts/build-packages.sh from a tarball
+# of the checked-out repository (ADR-0009). The version is fixed and bumped in
+# reviewed changes. At run time StarOS.Shell comes from the ISO's shell tree.
+
+pkgname=staros-lens
+pkgver=0.4.0
+pkgrel=1
+pkgdesc='Star OS screen text and code reader'
+arch=(x86_64)
+url='https://github.com/Jayyy-tuff/Star-OS'
+license=(GPL-3.0-or-later)
+# No split debug package; no LTO for the static QML module library.
+options=(!debug !lto)
+depends=(
+  gcc-libs
+  glibc
+  kguiaddons
+  kio
+  prison
+  qt6-base
+  qt6-declarative
+  qt6-svg
+  tesseract
+  tesseract-data-eng
+)
+makedepends=(
+  cmake
+  extra-cmake-modules
+  ninja
+)
+# Fonts to render the text that the recognition test reads back.
+checkdepends=(
+  desktop-file-utils
+  noto-fonts
+)
+source=(star-os-src.tar.gz)
+sha256sums=('SKIP')
+
+build() {
+  cmake -B build -S star-os-src/apps/lens -G Ninja \
+    -DCMAKE_INSTALL_PREFIX=/usr \
+    -DCMAKE_BUILD_TYPE=RelWithDebInfo \
+    -DBUILD_TESTING=ON
+  cmake --build build
+}
+
+check() {
+  QT_QPA_PLATFORM=offscreen QT_QUICK_BACKEND=software \
+    ctest --test-dir build --output-on-failure
+}
+
+package() {
+  DESTDIR="$pkgdir" cmake --install build
+}

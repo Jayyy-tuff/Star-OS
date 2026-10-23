@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 import QtQuick
 import StarOS.Shell
+import StarOS.System
 
 // The Sun Store window. The title is also its accessible name.
 Window {
@@ -18,12 +19,22 @@ Window {
         id: backend
     }
 
+    SystemStatus {
+        id: systemStatus
+    }
+
     StoreView {
         anchors.fill: parent
         focus: true
         store: backend
+        status: systemStatus
         onCloseRequested: window.close()
+        onStorageRequested: backend.openStarStorage()
     }
 
-    Component.onCompleted: backend.start()
+    // Discover opens on Star picks.
+    Component.onCompleted: {
+        backend.apps.category = "starpicks";
+        backend.start();
+    }
 }

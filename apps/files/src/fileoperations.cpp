@@ -2,6 +2,7 @@
 #include "fileoperations.h"
 
 #include <KApplicationTrader>
+#include <KIO/ApplicationLauncherJob>
 #include <KIO/CopyJob>
 #include <KIO/DeleteJob>
 #include <KIO/EmptyTrashJob>
@@ -18,6 +19,7 @@
 #include <QMimeData>
 #include <QMimeDatabase>
 #include <QMimeType>
+#include <QProcess>
 #include <QStringList>
 
 #include <algorithm>
@@ -34,6 +36,8 @@ const QString OpTrash = QStringLiteral("trash");
 const QString OpRestore = QStringLiteral("restore");
 const QString OpEmptyTrash = QStringLiteral("emptyTrash");
 const QString OpDelete = QStringLiteral("delete");
+const QString OpTerminal = QStringLiteral("terminal");
+const QString OpStorage = QStringLiteral("storage");
 
 const QString CutSelectionMime = QStringLiteral("application/x-kde-cutselection");
 
@@ -338,4 +342,35 @@ void FileOperations::setClipboard(const QList<QUrl> &urls, bool cut)
     data->setUrls(urls);
     data->setData(CutSelectionMime, cut ? QByteArrayLiteral("1") : QByteArrayLiteral("0"));
     QGuiApplication::clipboard()->setMimeData(data);
+}
+
+void FileOperations::setTerminalProgram(const QString &program)
+{
+    m_terminal = program;
+}
+
+bool FileOperations::openTerminal(const QUrl &folder)
+{
+    const QString path = folder.isLocalFile() ? folder.toLocalFile() : QString();
+    if (path.isEmpty() || !QFileInfo(path).isDir()) {
+        Q_EMIT failed(OpTerminal, tr("A terminal can only be opened in a folder on this computer."));
+        return false;
+    }
+    if (!QProcess::startDetached(m_terminal, {QStringLiteral("--workdir"), path}, path)) {
+        Q_EMIT failed(OpTerminal, tr("The terminal could not be started."));
+        return false;
+    }
+    return true;
+}
+
+bool FileOperations::openStarStorage()
+{
+    const KService::Ptr service = KService::serviceByDesktopName(QStringLiteral("org.staros.storage"));
+    if (!service) {
+        Q_EMIT failed(OpStorage, tr("Star Storage is not installed."));
+        return false;
+    }
+    auto *job = new KIO::ApplicationLauncherJob(service);
+    job->start();
+    return true;
 }

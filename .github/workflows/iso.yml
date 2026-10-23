@@ -53,10 +53,12 @@ jobs:
         run: |
           python3 -m unittest discover -s tests/iso -v
           python3 -m unittest discover -s tests/session -v
+      - name: Star Storage helper (disk checks and commands; nothing is run)
+        run: python3 apps/storage/tests/test_helper.py -v
       - name: Session report compiles
         run: |
           for f in distro/archiso/staros/airootfs/usr/local/libexec/staros-session-report \
-              tests/session/guest/*.py; do
+              tests/session/guest/*.py tests/storage/*.py; do
             python3 -c 'import sys; compile(open(sys.argv[1]).read(), sys.argv[1], "exec")' "$f"
           done
       - name: No forbidden environment variables (ADR-0008)
@@ -302,6 +304,45 @@ jobs:
         with:
           name: session-logs
           path: session-logs/
+          retention-days: 30
+          if-no-files-found: warn
+
+  storage-test:
+    name: Star Storage over three boots in QEMU (T0-40)
+    needs: build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 50
+    steps:
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' \
+            | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - name: Install QEMU and OVMF
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends qemu-system-x86 ovmf
+      - uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5.0.0
+        with:
+          name: staros-iso
+          path: iso
+      - name: Set up Star Storage on a scratch image, restart into it, keep a file
+        shell: bash
+        run: |
+          shopt -s nullglob
+          isos=(iso/*.iso)
+          [[ ${#isos[@]} -eq 1 ]] || { echo "expected one ISO, found ${#isos[@]}"; exit 1; }
+          python3 tests/storage/storage_test.py --iso "${isos[0]}" --log-dir storage-logs
+      - name: Upload Star Storage logs
+        if: always()
+        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5.0.0
+        with:
+          name: storage-logs
+          path: |
+            storage-logs/
+            !storage-logs/*.fd
           retention-days: 30
           if-no-files-found: warn
 

@@ -29,6 +29,8 @@ release decisions require explicit human approval before they become
 | [0008](0008-m02-shell-hosting-and-live-session.md) | M0.2 shell hosting and live session | Accepted (option A2; implementation in progress) |
 | [0009](0009-star-os-apps-build-and-packaging.md) | Star OS applications: C++/Qt Quick, built as pacman packages | Accepted |
 | [0010](0010-sun-store-flatpak.md) | Sun Store installs Flatpak apps from Flathub, per user, after consent | Accepted |
+| [0011](0011-star-storage-persistence.md) | Star Storage keeps the live system's changes on a disk the person erases for it | Accepted (option); live polkit rule awaits owner review |
+| [0012](0012-star-lens.md) | Star Lens reads the screen offline and sends images to Google Lens only when asked | Accepted |
 
 ## Template
 

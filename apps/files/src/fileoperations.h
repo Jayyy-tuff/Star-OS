@@ -63,6 +63,15 @@ public:
     Q_INVOKABLE void cutToClipboard(const QList<QUrl> &urls);
     Q_INVOKABLE void paste(const QUrl &destination);
 
+    // Starts the terminal (Konsole) in a local folder; reports failed()
+    // and returns false for anything else.
+    Q_INVOKABLE bool openTerminal(const QUrl &folder);
+    // Starts Star Storage (org.staros.storage), if it is installed.
+    Q_INVOKABLE bool openStarStorage();
+
+    // For tests: the terminal program, started with --workdir FOLDER.
+    void setTerminalProgram(const QString &program);
+
 Q_SIGNALS:
     void busyChanged();
     void progressChanged();
@@ -89,4 +98,5 @@ private:
     QHash<KJob *, Running> m_running;
     QList<KJob *> m_order; // oldest first; the newest one is reported
     int m_progress = -1;
+    QString m_terminal = QStringLiteral("/usr/bin/konsole");
 };

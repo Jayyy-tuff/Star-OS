@@ -74,7 +74,8 @@ public:
     Q_INVOKABLE bool isInstalled(const QString &appId) const;
     // The row of an app in the current filter, or -1.
     Q_INVOKABLE int indexOf(const QString &appId) const;
-    // The category ids the Discover section offers, in display order.
+    // The category ids the Discover section offers, in display order: Star
+    // picks ("starpicks"), all apps (""), then Flathub's main categories.
     Q_INVOKABLE QStringList categoryIds() const;
     Q_INVOKABLE QString categoryName(const QString &id) const;
 

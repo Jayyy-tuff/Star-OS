@@ -3,19 +3,25 @@ pragma ComponentBehavior: Bound
 
 import QtQuick
 import StarOS.Shell
+import "fileinfo.js" as FileInfo
 
-// The Files window content: tool bar, places, folder contents, status line and
-// dialogs, all on frosted glass. It only talks to the three objects below, so
-// tests pass doubles:
-//   folderModel  FolderModel: rows with the roles name, url, isDir and
-//                accessibleDescription; url (writable), location, parentUrl,
-//                isTrash, nameFilter, showHidden, count, loading, errorString;
-//                refresh(), indexOfUrl(url), urlFromLocation(text).
+// The Files window content: tool bar, places, storage, folder contents,
+// status line and dialogs, all on frosted glass. It only talks to the objects
+// below, so tests pass doubles:
+//   folderModel  FolderModel: rows with the roles name, url, isDir,
+//                accessibleDescription, mimeType and size; url (writable),
+//                location, parentUrl, isTrash, nameFilter, showHidden,
+//                sortKey (0 name, 1 size, 2 modified), freeText, count,
+//                loading, errorString; refresh(), indexOfUrl(url),
+//                urlFromLocation(text).
 //   places       PlacesModel: rows with name and url; indexOfUrl(url),
 //                nameForUrl(url).
-//   operations   FileOperations: the operations, nameError(name), busy,
-//                progress, statusText, and the signals finished(operation,
-//                urls) and failed(operation, message).
+//   operations   FileOperations: the operations, nameError(name),
+//                openTerminal(url), openStarStorage(), busy, progress,
+//                statusText, and the signals finished(operation, urls) and
+//                failed(operation, message).
+//   status       optional, StarOS.System's SystemStatus: storageMode,
+//                storageFree, storageTotal, for the storage panel.
 // URLs kept here (history, selection) are strings: a url value read from a
 // property can be a live reference to that property.
 FocusScope {
@@ -24,6 +30,7 @@ FocusScope {
     required property var folderModel
     required property var places
     required property var operations
+    property var status: null
 
     readonly property string folderName: root.places.nameForUrl(root.folderModel.url)
     readonly property string title: qsTr("Files — %1").arg(root.folderName)
@@ -33,6 +40,19 @@ FocusScope {
     readonly property bool canGoUp: String(root.folderModel.parentUrl) !== ""
     readonly property size windowSize: Qt.size(root.width, root.height)
     readonly property int margin: Theme.spacing
+    readonly property var sortNames: [qsTr("Name"), qsTr("Size"), qsTr("Modified")]
+    readonly property string storageMode: root.status ? String(root.status.storageMode) : ""
+    readonly property string storageText: {
+        const free = FileInfo.formatBytes(root.status ? root.status.storageFree : 0);
+        const total = FileInfo.formatBytes(root.status ? root.status.storageTotal : 0);
+        if (root.storageMode === "star-storage") {
+            return qsTr("Star Storage: %1 free of %2.").arg(free).arg(total);
+        }
+        if (root.storageMode === "live") {
+            return qsTr("Live session: %1 free of %2. Changes are lost at shutdown.").arg(free).arg(total);
+        }
+        return qsTr("%1 free of %2.").arg(free).arg(total);
+    }
 
     property var backStack: []
     property var forwardStack: []
@@ -67,11 +87,30 @@ FocusScope {
         if (root.folderModel.loading) {
             return qsTr("Loading…");
         }
-        return root.folderModel.count === 1 ? qsTr("1 item") : qsTr("%1 items").arg(root.folderModel.count);
+        const items = root.folderModel.count === 1 ? qsTr("1 item") : qsTr("%1 items").arg(root.folderModel.count);
+        return root.folderModel.freeText ? qsTr("%1 · %2").arg(items).arg(root.folderModel.freeText) : items;
     }
 
     Accessible.role: Accessible.Pane
     Accessible.name: qsTr("Files")
+
+    // Sorts by name (0), size (1) or time modified (2), keeping the current item.
+    function setSort(key) {
+        const current = contents.currentItem ? String(contents.currentItem.url) : "";
+        root.folderModel.sortKey = key;
+        if (current !== "") {
+            const row = root.folderModel.indexOfUrl(current);
+            if (row >= 0) {
+                contents.currentIndex = row;
+            }
+        }
+    }
+
+    function openTerminal() {
+        if (!root.folderModel.isTrash) {
+            root.operations.openTerminal(root.folderModel.url);
+        }
+    }
 
     function sameUrl(a, b) {
         return String(a) === String(b);
@@ -387,6 +426,26 @@ FocusScope {
         enabled: !root.dialogOpen
         onActivated: root.folderModel.refresh()
     }
+    Shortcut {
+        sequence: "Ctrl+1"
+        enabled: !root.dialogOpen
+        onActivated: root.setSort(0)
+    }
+    Shortcut {
+        sequence: "Ctrl+2"
+        enabled: !root.dialogOpen
+        onActivated: root.setSort(1)
+    }
+    Shortcut {
+        sequence: "Ctrl+3"
+        enabled: !root.dialogOpen
+        onActivated: root.setSort(2)
+    }
+    Shortcut {
+        sequence: "Shift+F4"
+        enabled: !root.dialogOpen
+        onActivated: root.openTerminal()
+    }
 
     // The window background: the wallpaper, frosted.
     GlassSurface {
@@ -517,6 +576,23 @@ FocusScope {
             spacing: root.margin / 2
 
             FilesButton {
+                id: sortButton
+                objectName: "sortButton"
+                text: qsTr("Sort: %1").arg(root.sortNames[root.folderModel.sortKey] ?? root.sortNames[0])
+                description: qsTr("Ctrl+1 name, Ctrl+2 size, Ctrl+3 time modified")
+                onClicked: root.setSort((root.folderModel.sortKey + 1) % 3)
+            }
+
+            FilesButton {
+                id: terminalButton
+                objectName: "terminalButton"
+                visible: !root.folderModel.isTrash
+                text: qsTr("Open Terminal")
+                description: qsTr("Shift+F4")
+                onClicked: root.openTerminal()
+            }
+
+            FilesButton {
                 id: hiddenButton
                 objectName: "hiddenButton"
                 toggle: true
@@ -581,7 +657,10 @@ FocusScope {
     ListView {
         id: placesList
         objectName: "places"
-        anchors.fill: sidebarGlass
+        anchors.top: sidebarGlass.top
+        anchors.left: sidebarGlass.left
+        anchors.right: sidebarGlass.right
+        anchors.bottom: storagePanel.visible ? storagePanel.top : sidebarGlass.bottom
         anchors.margins: root.margin / 2
         model: root.places
         clip: true
@@ -616,6 +695,67 @@ FocusScope {
             if (activeFocus && currentIndex < 0 && count > 0) {
                 currentIndex = 0;
             }
+        }
+    }
+
+    // Where this session keeps its changes, and the way to Star Storage.
+    Column {
+        id: storagePanel
+        objectName: "storagePanel"
+        x: sidebarGlass.x + root.margin / 2
+        y: sidebarGlass.y + sidebarGlass.height - height - root.margin / 2
+        width: sidebarGlass.width - root.margin
+        visible: root.status !== null && root.storageMode !== ""
+        spacing: root.margin / 2
+
+        Accessible.role: Accessible.Grouping
+        Accessible.name: qsTr("Storage")
+        Accessible.description: root.storageText
+
+        Text {
+            width: parent.width
+            text: qsTr("Storage")
+            color: Theme.text
+            font.family: Theme.metrics.font.family
+            font.bold: true
+            Accessible.ignored: true
+        }
+
+        Rectangle {
+            objectName: "storageBar"
+            width: parent.width
+            height: Math.max(4, Math.round(root.margin / 2))
+            radius: height / 2
+            color: Theme.tileGlass
+            Accessible.ignored: true
+
+            Rectangle {
+                readonly property real total: root.status ? Number(root.status.storageTotal) : 0
+                readonly property real used: total > 0 ? Math.min(1, Math.max(0, 1 - Number(root.status.storageFree) / total)) : 0
+                width: Math.round(parent.width * used)
+                height: parent.height
+                radius: parent.radius
+                color: used > 0.9 ? Theme.focusRing : Theme.activeIndicator
+            }
+        }
+
+        Text {
+            objectName: "storageText"
+            width: parent.width
+            text: root.storageText
+            color: Theme.text
+            font: Theme.metrics.font
+            wrapMode: Text.Wrap
+            Accessible.ignored: true
+        }
+
+        FilesButton {
+            objectName: "storageButton"
+            width: Math.min(implicitWidth, parent.width)
+            visible: root.storageMode !== "installed"
+            text: root.storageMode === "star-storage" ? qsTr("Star Storage") : qsTr("Set up Star Storage")
+            description: qsTr("Keep your files, settings and apps on a disk")
+            onClicked: root.operations.openStarStorage()
         }
     }
 

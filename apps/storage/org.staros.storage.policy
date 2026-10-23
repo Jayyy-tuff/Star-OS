@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE policyconfig PUBLIC "-//freedesktop//DTD PolicyKit Policy Configuration 1.0//EN"
+ "http://www.freedesktop.org/standards/PolicyKit/1/policyconfig.dtd">
+<!-- SPDX-License-Identifier: GPL-3.0-or-later -->
+<!-- Star Storage (M0.4, ADR-0011): pkexec runs only this helper for the
+     action, which erases a disk the person chose or sets the next start. -->
+<policyconfig>
+  <vendor>Star OS</vendor>
+  <vendor_url>https://github.com/Jayyy-tuff/Star-OS</vendor_url>
+  <action id="org.staros.storage.manage">
+    <description>Set up Star Storage</description>
+    <message>Authentication is required to erase a disk for Star Storage or to change how Star OS starts.</message>
+    <icon_name>drive-harddisk</icon_name>
+    <defaults>
+      <allow_any>no</allow_any>
+      <allow_inactive>no</allow_inactive>
+      <allow_active>auth_admin_keep</allow_active>
+    </defaults>
+    <annotate key="org.freedesktop.policykit.exec.path">/usr/lib/staros/staros-storage-helper</annotate>
+  </action>
+</policyconfig>
