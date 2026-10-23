@@ -20,7 +20,7 @@ security uncertainties, and record human approval of the architecture.
 | Build environment setup | ADR-0003 + milestone M0.1 | **M0.1 complete** (CI build, QEMU boots, VMware boot) |
 | Qt/QML shell prototype | milestone M0.2 | CI green (run 12); owner's VMware run pending |
 | Glass theme, Files, Sun Store | milestone M0.3 | CI green (run 18); owner's VMware run pending |
-| Apps, Star Lens, Star Storage, desktop features | milestone M0.4 | CI green (run 24); owner's VMware run and review of the live storage rule pending |
+| Apps, Star Lens, Star Storage, desktop features | milestone M0.4 | CI green (runs 24 and 25); owner's VMware run and review of the live storage rule pending |
 | Moon Browser integration checklist | — | Removed from the current scope at the owner's request (2026-10-19); the owner will add Moon Browser later. No other browser will be substituted without approval |
 
 ## Smallest useful deliverable: M0.1 — console ISO prototype
@@ -347,10 +347,19 @@ helper, rows read before they existed).
   answers) and idle CPU rose from 0.07 % to 0.18 %, probably the system
   meter's 5-second refresh. Not a performance claim.
 
-S17 note: run 24 also reported "Results" after Ctrl+A and Return, but that
-check also counted hidden objects, so it did not prove that recognition had
-finished. Commit 3ada26a counts only objects on screen (S12, S13, S17 and
-the Star Storage checks); its CI result is added here when the run ends.
+S17 correction: run 24 also reported "Results" after Ctrl+A and Return, but
+that check counted hidden objects too, so it did not prove that recognition
+had finished. Commit 3ada26a counts only objects on screen (S12, S13, S17 and
+the Star Storage checks). **CI run 25 on 3ada26a: every job green** with the
+stricter checks. S17 there: "Select an area" on screen, then the "Results"
+panel with Copy text, Search the web, Copy image, Save image, Search with
+Google Lens; the text read from the whole 1920×1080 screen (informational)
+begins "hello star / Applications / Delete / ~:bash — Konsole … Files — Home
+/ Sun Store / Enable Flathub? / Sun Store installs apps from Flathub, a
+community app store. Star OS does not review these apps. …": window titles,
+the sticky note and the dialog were read correctly; small labels on the
+glass taskbar came out as fragments ("D¢", "stoy", "Live|"). The Star
+Storage test passed B1–B3 again.
 
 Not tested in CI: recognition quality on real screens, Google Lens and web
 search (no network), Firefox and VLC beyond their packages and desktop files,
