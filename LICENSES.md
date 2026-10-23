@@ -26,3 +26,13 @@ The Sun Store package ships Flathub's remote definition
 (`/usr/share/staros-sunstore/flathub.flatpakrepo`, downloaded from
 dl.flathub.org at build time with a pinned checksum). Apps installed from
 Flathub come under their own licenses, which Sun Store shows on each app page.
+
+Since M0.4 the ISO preinstalls Firefox, VLC, Okular, Gwenview, Ark, Kate
+(which provides KWrite) and KCalc, unmodified, from the pinned Arch snapshot.
+Firefox is Mozilla's trademark and comes as Arch packages it; Star OS does
+not rebrand or patch it. Star Lens uses Tesseract (Apache-2.0) and its
+English data (`tesseract-data-eng`, Apache-2.0) and KDE's Prison (MIT and
+LGPL-2.1-or-later, with ZXing-C++, Apache-2.0). Star OS shows third-party
+apps with their own icons from the icon theme; it does not redraw their
+logos. "Star picks" in Sun Store names Flathub apps; they come under their
+own licenses like any other Flathub app.

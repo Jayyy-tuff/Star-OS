@@ -94,6 +94,50 @@ M0.2, a QEMU result is never reported as a VMware or hardware result.
 | T0-33 | Frosted glass theme | E-CI, E-VMW | Unit: theme contrast on the worst-case glass (text 9.43:1, focus ring 5.79:1 over the lightest wallpaper colour), the opaque fallback under the software scene graph, wallpaper offsets of taskbar and launcher glass, every icon loads; artwork licence, SVG subset and size limits (`check_shell_sources.py`). Session: the screen dump edge (informational). Owner: glass looks frosted with 3D on, opaque and readable with 3D off | Unit: **yes** (`shell-checks`, `lint`). Session: informational |
 | T0-34 | Launcher catalogue | E-CI | The launcher lists Files, Konsole, Sun Store and System Settings with their Star OS icons (unit); "fil" and "sun" launch Files and Sun Store (S12, S13); Orca's debug log names the first tile "Files" (S10, informational) | **yes** |
 
+## Phase 0 tests (milestone M0.4, ADR-0011, ADR-0012)
+
+Design contract: `docs/architecture/m04-apps-lens-storage-design.md`. "CI
+now" says where CI runs a test; results are recorded in
+`docs/development/phase-0-plan.md` from CI runs only.
+
+| ID | Test | Env | Pass condition | CI now |
+| --- | --- | --- | --- | --- |
+| T0-35 | Preinstalled apps | E-CI, E-VMW | Firefox, VLC, Okular, Gwenview, Ark, KWrite and KCalc in the image; the launcher's catalogue desktop files exist (image policy); third-party apps show their theme icon through the Kirigami fallback, the monogram without one (unit). Owner: each starts from the launcher | **yes** (`build` policy, `shell-checks`) |
+| T0-36 | Quick answers and sticky notes | E-CI, E-VMW | Unit: `quickanswers.js` cases (sums, percentages, units, division by zero, no answer for plain numbers); launcher answer card, Return copies, `note:` requests a note; notes board adds, saves after a pause and on leaving, moves, deletes, Tab between notes; `NotesStore` saves, reloads changes from another store, limits size. Session: S14 "12*3" shows "Answer: 36" and Return copies it; S15 "note: hello star" in `notes.json` and on the desktop | **yes** (`shell-checks`, `packages`, `session-test` S14, S15) |
+| T0-37 | System meter | E-CI, E-VMW | Unit: storage and memory bars, decimal sizes, live/Star Storage/installed descriptions, keyboard order in the taskbar; `SystemStatus` from fixture files. Session: S16 "Live session: changes are lost at shutdown."; storage test B2 "Star Storage: …" | **yes** (`shell-checks`, `packages`, `session-test` S16, `storage-test` B2) |
+| T0-38 | Star Lens | E-CI, E-VMW | Unit: Tesseract reads rendered text, Prison codes are read with their format, links found; selection at scale 2 cut at full resolution; copy, save, only found links open, Google Lens only after the dialog (Cancel focused, Escape cancels); the window without KWin explains the failure. Session: S17 KWin grants the screenshot ("Select an area"), Ctrl+A and Return show "Results", Escape twice closes. Owner: real text and a QR code on screen, Google Lens with network | **yes** (`packages`, `session-test` S17) |
+| T0-39 | Files and Sun Store additions | E-CI, E-VMW | Unit: sort by size (largest first) and time (newest first) with folders first, Ctrl+1/2/3, free space, type kinds and thumbnails only for small local images, Storage panel texts and button, Open Terminal (Shift+F4) only for local folders; Star picks first and only curated ids, the storage banner | **yes** (`packages`) |
+| T0-40 | Star Storage | E-CI, E-VMW | Unit: the helper offers and refuses disks as ADR-0011 lists, runs exactly the expected commands (none are run in tests), boot choices need UEFI and systemd-boot; the backend with stand-in scripts (steps, errors, "Permission was not given.", restart); the view requires the typed name. Build: one UEFI and one BIOS "with Star Storage" entry with a per-build folder. Image: helper root:root 755, polkit action requires an administrator, the live rule allows only that action for liveuser. QEMU, scratch image, three boots: set up through the app by keyboard, restart into it, the overlay on `vda1`, the meter says "Star Storage", "Always start" on, the marker file kept. Owner: a USB stick in VMware | **yes** (`lint`, `packages`, `build`, `storage-test`) |
+
+## Manual procedure: VMware Workstation, M0.4 (T0-35..T0-40)
+
+Use the ISO of a green CI run and record its link. Give the VM network (NAT),
+4 GB RAM, UEFI firmware, and a second, empty virtual disk of at least 8 GB
+(VMware: Add > Hard Disk > 10 GB). Never use a disk that holds data.
+
+1. Launcher (T0-35): Firefox, VLC, Okular, Gwenview, Ark, KWrite and KCalc
+   have their own icons and start. Type `5 km in miles`: the card shows
+   `= 3.106855961 mi`; Return, then paste in KWrite (T0-36). Type
+   `note: buy milk`, Return: a note appears on the desktop; edit it, drag it,
+   delete it.
+2. Taskbar (T0-37): the System status button shows "Live · … free"; Orca
+   reads its description. Activate it: Star Storage opens.
+3. Star Lens (T0-38): open a web page with text and a QR code in Firefox,
+   press Meta+Shift+L, drag over the text: it is read; select the QR code:
+   its text and "Open …" appear. "Search with Google Lens" asks first;
+   Cancel; then confirm: Google Lens opens in Firefox, Ctrl+V pastes the
+   image. Copy text, close Star Lens, paste in KWrite: the text is there.
+4. Files and Sun Store (T0-39): Sort: Size and Ctrl+3; images show
+   thumbnails; the Storage panel and the free space in the status line;
+   Shift+F4 opens Konsole in the folder. Sun Store opens on "Star picks" with
+   the live-session banner.
+5. Star Storage (T0-40): choose the second disk (check model and size), type
+   its name, "Erase and set up", then "Restart into Star Storage". Expected:
+   the session starts again, the meter says "Star Storage: …", a file saved
+   in Home and an app installed from Sun Store are still there after another
+   restart with "Always start with Star Storage" on. Remove the disk and
+   start the default entry: the live session without it still works.
+
 ## Manual procedure: VMware Workstation, M0.3 (T0-30..T0-34)
 
 Use the ISO of a green CI run and record that run's link in the log. The VM

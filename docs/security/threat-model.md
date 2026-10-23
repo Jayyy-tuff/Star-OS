@@ -55,6 +55,9 @@ every new privileged component.
 | 14 | Argument or path injection into `flatpak` | Argument lists through `QProcess`, never a shell; app ids must match a strict reverse-DNS pattern (no leading `-`, no `/`, no spaces) or nothing runs; standard input closed | 0 (M0.3) |
 | 15 | The file manager destroys data or runs untrusted files | Delete moves to the Trash; permanent deletion and emptying the Trash ask first, with Cancel focused; Files never starts programs (executables are refused, scripts and desktop entries open as text); it runs as the user only | 0 (M0.3) |
 | 16 | Unsigned Star OS packages | The `[staros]` repository is a local directory used during one CI build only; the image's pacman configuration does not list it (image policy); a signed repository is Phase 4 (threat #1) | 0 (M0.3) |
+| 17 | Star Storage erases the wrong disk | The person types the disk's exact name; the warning lists its partitions; the helper re-reads `lsblk` as root and refuses the Star OS medium (iso9660 or the ISO's UUID), disks with a mounted partition, read-only disks, disks under 8 GiB, names outside `sd*`, `vd*`, `xvd*`, `nvme*n*`, `mmcblk*`, a mismatched confirmation and a second `STAROS_DATA` disk; unit tests cover every refusal and the exact commands; CI uses a scratch image only (ADR-0011) | 0 (M0.4) |
+| 18 | The Star Storage helper is abused for root | pkexec runs only `/usr/lib/staros/staros-storage-helper` under `org.staros.storage.manage` (`exec.path` annotation, `auth_admin_keep`); the helper takes three fixed commands, validates every argument, runs tools from `/usr/bin` without a shell and with a fixed environment; the live-only polkit rule matches that action and `liveuser` only (image policy) | 0 (M0.4) |
+| 19 | Screen contents leak through Star Lens | Screenshots only through KWin's packaged grant to `/usr/bin/staros-lens` (no permission bypass); recognition is offline; links open only if recognised and http(s); Google Lens is opened only after a warning every time, and the person uploads the image themselves (ADR-0012) | 0 (M0.4) |
 
 ## Accepted risks in Phase 0
 
@@ -98,6 +101,16 @@ every new privileged component.
   person's files. Sun Store lists such permissions in plain words; it does not
   block them. On the live medium installed apps live in RAM and disappear at
   shutdown.
+- **Star Storage on the live medium** (M0.4, ADR-0011). The polkit rule
+  `/etc/polkit-1/rules.d/49-staros-live-storage.rules` lets `liveuser` run
+  the Star Storage helper without a password, as its sudo rule already does
+  for everything; the installer must not copy the rule. The Star Storage disk
+  is plain ext4: anyone holding it can read the kept files, settings and
+  Flatpak apps. Persistence keeps everything written to the overlay, including
+  logs and caches. Pending owner review of the rule.
+- **Star Lens keeps running after a copy** until something else is copied,
+  so the copy survives without a clipboard manager (ADR-0012). "Search the
+  web" sends the recognised text to Google when pressed.
 - **No Secure Boot.** Users must disable Secure Boot to boot prototypes
   (ADR-0006).
 - **Prototype ISOs are unsigned.** CI artifacts are for testing only and must
@@ -111,6 +124,7 @@ ships its own privileged session services.
 
 - Who holds the package and release signing keys, and on what hardware?
 - Will the project apply for Microsoft-signed shim (ADR-0006)?
-- The default browser is undecided. Moon Browser was removed from the current
-  scope at the owner's request (2026-10-19). Whatever browser ships needs its
-  own review of its security update process and sandboxing.
+- The browser: Firefox from the pinned Arch snapshot is preinstalled since
+  M0.4 and is the default for links (Moon Browser stays reserved for the
+  owner). Its updates follow the snapshot, so a live ISO's Firefox ages with
+  the ISO; the update process is a Phase 4 question.
