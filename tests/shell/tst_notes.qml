@@ -144,6 +144,8 @@ Item {
         function test_delete() {
             fakeNotes.addNote("a");
             fakeNotes.addNote("b");
+            // Apart, so the click reaches the first note and not the one on top.
+            fakeNotes.moveNote("n2", 1, 1);
             tryVerify(() => noteAt(1) !== null, 5000);
             mouseClick(findChild(noteAt(0), "deleteButton"));
             compare(fakeNotes.count, 1);

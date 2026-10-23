@@ -43,6 +43,7 @@ target_link_libraries(staros_lens_ui
 
 qt_add_executable(staros-lens main.cpp)
 target_compile_definitions(staros-lens PRIVATE STAROS_LENS_VERSION="${PROJECT_VERSION}")
-target_link_libraries(staros-lens PRIVATE staros_lens_uiplugin Qt6::Gui Qt6::Qml)
+# main.cpp registers CaptureProvider, a QQuickImageProvider.
+target_link_libraries(staros-lens PRIVATE staros_lens_uiplugin staros_lens_ui Qt6::Gui Qt6::Qml Qt6::Quick)
 
 install(TARGETS staros-lens ${KDE_INSTALL_TARGETS_DEFAULT_ARGS})
