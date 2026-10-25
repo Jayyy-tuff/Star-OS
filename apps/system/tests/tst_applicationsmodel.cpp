@@ -269,6 +269,8 @@ private Q_SLOTS:
         auto model = makeModel();
         QSignalSpy revisions(model.get(), &ApplicationsModel::revisionChanged);
         QVERIFY(model->find(QStringLiteral("org.example.Game")).isEmpty());
+        // Newer than the apps written at the start, to the millisecond.
+        QTest::qWait(20);
         writeFlatpak(QStringLiteral("org.example.Game"), QStringLiteral("Space Game"), QStringLiteral("Categories=Game;\n"));
         QTRY_VERIFY_WITH_TIMEOUT(!model->find(QStringLiteral("org.example.Game")).isEmpty(), 15000);
         QVERIFY(revisions.count() > 0);

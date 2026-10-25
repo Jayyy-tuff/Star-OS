@@ -57,7 +57,7 @@ QDateTime linkTime(const QString &path)
     if (::lstat(QFile::encodeName(path).constData(), &st) != 0) {
         return {};
     }
-    return QDateTime::fromSecsSinceEpoch(st.st_mtime);
+    return QDateTime::fromMSecsSinceEpoch(qint64(st.st_mtim.tv_sec) * 1000 + st.st_mtim.tv_nsec / 1000000);
 }
 }
 
