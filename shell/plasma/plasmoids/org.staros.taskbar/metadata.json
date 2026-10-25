@@ -6,11 +6,11 @@
                 "Name": "Star OS project"
             }
         ],
-        "Description": "Star OS prototype taskbar and full-screen launcher",
+        "Description": "Star OS floating taskbar and start menu",
         "Id": "org.staros.taskbar",
         "License": "GPL-3.0-or-later",
         "Name": "Star OS taskbar",
-        "Version": "0.3",
+        "Version": "0.5",
         "Website": "https://github.com/Jayyy-tuff/Star-OS"
     },
     "NoDisplay": true,

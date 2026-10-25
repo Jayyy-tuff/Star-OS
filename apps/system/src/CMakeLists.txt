@@ -8,11 +8,12 @@ qt_add_qml_module(staros_system
     PLUGIN_TARGET staros_system
     OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/qml/StarOS/System
     SOURCES
+        applicationsmodel.cpp applicationsmodel.h
         notesstore.cpp notesstore.h
         systemstatus.cpp systemstatus.h
 )
 
-target_link_libraries(staros_system PRIVATE Qt6::Core Qt6::Qml)
+target_link_libraries(staros_system PRIVATE Qt6::Core Qt6::Qml KF6::KIOGui KF6::Service)
 # KDECMakeSettings drops the prefix of MODULE libraries; the QML engine looks
 # for lib<plugin>.so.
 set_target_properties(staros_system PROPERTIES PREFIX "lib")

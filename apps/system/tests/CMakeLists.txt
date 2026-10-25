@@ -2,13 +2,14 @@
 
 # The tests compile the module's classes directly; the plugin itself has no
 # library to link.
-foreach(test_name tst_systemstatus tst_notesstore)
+foreach(test_name tst_systemstatus tst_notesstore tst_applicationsmodel)
     add_executable(${test_name} ${test_name}.cpp
+        ${PROJECT_SOURCE_DIR}/src/applicationsmodel.cpp
         ${PROJECT_SOURCE_DIR}/src/systemstatus.cpp
         ${PROJECT_SOURCE_DIR}/src/notesstore.cpp
     )
     target_include_directories(${test_name} PRIVATE ${PROJECT_SOURCE_DIR}/src)
-    target_link_libraries(${test_name} PRIVATE Qt6::Core Qt6::Qml Qt6::Test)
+    target_link_libraries(${test_name} PRIVATE Qt6::Core Qt6::Qml Qt6::Test KF6::KIOGui KF6::Service)
     add_test(NAME ${test_name} COMMAND ${test_name})
 endforeach()
 
@@ -22,3 +23,9 @@ add_dependencies(tst_qmlimport staros_system)
 
 set_tests_properties(tst_systemstatus tst_notesstore qml_import PROPERTIES
     ENVIRONMENT "QT_QPA_PLATFORM=offscreen" TIMEOUT 120)
+# The applications test sees only its own desktop files: a "system" and a
+# Flatpak export directory under the build tree, and the test-mode user data.
+set(apps_data ${CMAKE_CURRENT_BINARY_DIR}/apps-data)
+set_tests_properties(tst_applicationsmodel PROPERTIES
+    ENVIRONMENT "QT_QPA_PLATFORM=offscreen;XDG_CURRENT_DESKTOP=KDE;STAROS_TEST_DATA=${apps_data};XDG_DATA_DIRS=${apps_data}/system:${apps_data}/flatpak/exports/share"
+    TIMEOUT 120)

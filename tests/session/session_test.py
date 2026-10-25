@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: GPL-3.0-or-later
-"""Drives the Star OS prototype session on the CI-built ISO (M0.2, M0.3).
+"""Drives the Star OS prototype session on the CI-built ISO (M0.2 to M0.5).
 
 Boots the ISO in QEMU/KVM with the graphical profile, a QEMU guest agent port
 and a USB tablet, waits for staros-session-report's verdict, then runs the
@@ -14,21 +14,24 @@ from three independent views:
   screen  QMP screen dumps (saved as PNG; informational).
 
 Scenarios:
-  S0 guest agent answers            S5 launch Konsole from the launcher
+  S0 guest agent answers            S5 launch Konsole from the start menu
   S1 session facts                  S6 launch System Settings
   S2 test helpers and KWin oracle   S7 both windows in the taskbar
   S3 taskbar over AT-SPI            S8 switch windows with Meta+Alt+P
-  S4 Meta opens the launcher        S9 Escape closes the launcher
+  S4 Meta opens the start menu      S9 Escape closes the start menu
   S12 launch Files; its Places and Folder contents lists over AT-SPI
   S13 launch Sun Store; its first-run "Enable Flathub" button over AT-SPI
       (CI has no network; nothing is added or downloaded)
   S14 quick answer: "12*3" shows "Answer: 36"; Return copies it
   S15 sticky note: "note: hello star" puts a note on the desktop and in
       ~/.local/share/staros/notes.json
-  S16 the taskbar's "System status" says the session is live (in memory)
+  S16 the taskbar's "Quick settings" says the session is live (in memory)
   S17 Star Lens (Meta+Shift+L, else the launcher) takes a screenshot through
       KWin's grant, asks to select an area; Ctrl+A, Return show the results
       (the recognised text is informational); Escape twice closes it
+  S18 an app exported into the live user's Flatpak directory while the
+      session runs appears in the start menu's "Recently installed" without a
+      restart, and starts from a search (ADR-0013)
   Informational: S11 scaling with kscreen-doctor (AT-SPI geometry and screen
   dumps at 150, 200 and 100 %), S10 Orca (Meta+Alt+S, then a debug Orca's
   speech output for the launcher).
@@ -349,7 +352,8 @@ def run_scenarios(s):
     toolbar = find(tree, role="tool bar", name="Taskbar")
     s.check("S3", bool(toolbar), "plasmashell exposes a 'Taskbar' tool bar")
     outline = [(n.get("role"), n.get("name")) for n in find(toolbar[0])]
-    for role, name in ((BUTTON, "Applications"), ("list", "Open windows"), (BUTTON, "Leave")):
+    for role, name in ((BUTTON, "Applications"), ("list", "Apps"), (BUTTON, "Quick settings"),
+                       (BUTTON, "Clock"), (BUTTON, "Notifications")):
         s.check("S3", bool(find(toolbar[0], role=role, name=name)),
                 f"{name!r} in the taskbar; taskbar objects: {outline}")
     s.screenshot("S3-desktop")
@@ -375,21 +379,24 @@ def run_scenarios(s):
     # S6: a second application.
     s.keys("meta_l")
     s.wait_focus("text", "Search applications")
-    s.type_text("sys")
+    s.type_text("system set")
     s.keys("ret")
     report = s.wait_oracle(lambda e: is_active(e, SETTINGS), 60, f"active {SETTINGS}")
     s.check("S6", True, f"System Settings launched and active per KWin: {json.dumps(report)}")
 
-    # S7: both windows are listed by the taskbar; the active one is marked.
+    # S7: both windows are in the taskbar's apps (with the pinned apps); the
+    # active one is marked.
     time.sleep(3)
     tree = s.atspi("walk", "plasmashell", "20")
     with open(os.path.join(s.log_dir, "atspi-two-windows.json"), "w") as f:
         json.dump(tree, f, indent=1)
-    windows = find(tree, role="list", name="Open windows")
-    buttons = find(windows[0], role=BUTTON) if windows else []
-    s.check("S7", len(buttons) == 2,
-            "taskbar buttons: " + json.dumps([(b["name"], b["description"]) for b in buttons]))
-    active = [b for b in buttons if b["description"] == "Active window"]
+    apps = find(tree, role="list", name="Apps")
+    buttons = find(apps[0], role=BUTTON) if apps else []
+    windows = [b for b in buttons if b.get("description") in ("Window", "Active window")]
+    s.record("S7", "INFO", "taskbar apps: " + json.dumps([(b["name"], b["description"]) for b in buttons]))
+    s.check("S7", len(windows) == 2,
+            "window buttons: " + json.dumps([(b["name"], b["description"]) for b in windows]))
+    active = [b for b in windows if b["description"] == "Active window"]
     s.check("S7", len(active) == 1, "exactly one button is described as 'Active window'")
     s.screenshot("S7-two-windows")
 
@@ -398,12 +405,18 @@ def run_scenarios(s):
     focus = s.wait_focus(BUTTON, "Applications")
     s.check("S8", focus.get("name") == "Applications",
             f"Meta+Alt+P focuses the taskbar: {json.dumps(focus)}")
-    s.keys("right")
-    focus = s.wait_focus(BUTTON, None)
-    s.record("S8", "INFO", f"Right focuses {json.dumps(focus)}")
+    # Right moves through the pinned apps to Konsole's window.
+    focus = {}
+    for _ in range(10):
+        s.keys("right")
+        time.sleep(0.4)
+        focus = s.wait_focus(BUTTON, None)
+        if "Konsole" in str(focus.get("name")) and focus.get("description") == "Window":
+            break
+    s.check("S8", "Konsole" in str(focus.get("name")), f"Right reaches Konsole's window: {json.dumps(focus)}")
     s.keys("ret")
     report = s.wait_oracle(lambda e: is_active(e, KONSOLE), 20, f"active {KONSOLE}")
-    s.check("S8", True, f"Return on the first task activates Konsole: {json.dumps(report)}")
+    s.check("S8", True, f"Return on Konsole's button activates it: {json.dumps(report)}")
 
     # S9: Escape closes the launcher and KWin returns focus to the window.
     s.keys("meta_l")
@@ -467,11 +480,11 @@ def run_scenarios(s):
     s.check("S15", bool(notes), "the desktop shows a 'Sticky note' with the text over AT-SPI")
     s.screenshot("S15-note")
 
-    # S16: the system meter says where changes are kept.
-    meters = find(tree, role=BUTTON, name="System status")
-    detail = meters[0].get("description", "") if meters else ""
+    # S16: the tray's Quick settings button says where changes are kept.
+    trays = find(tree, role=BUTTON, name="Quick settings")
+    detail = trays[0].get("description", "") if trays else ""
     s.check("S16", detail.startswith("Live session: changes are lost at shutdown."),
-            f"'System status' says: {detail!r}")
+            f"'Quick settings' says: {detail!r}")
 
     # S17: Star Lens. Meta+Shift+L is its global shortcut, registered from its
     # desktop file (informational); when it does not start Star Lens the
@@ -517,6 +530,12 @@ def run_scenarios(s):
         time.sleep(1)
         code, _, _ = s.guest(["/usr/bin/pgrep", "-x", "staros-lens"])
     s.check("S17", code == 1, "Escape twice closed Star Lens")
+
+    # S18: an app installed while the session runs appears in the start menu
+    # (ADR-0013). Flatpak exports desktop files into the user's export
+    # directory; this writes one there as Flatpak would, with an Exec that
+    # leaves a marker, without network.
+    scenario_installed_app(s)
 
     # Informational until each has three consecutive green runs (design spec).
     for scenario in (scenario_scaling, scenario_orca):
@@ -569,7 +588,7 @@ def launcher_geometry(tree):
     if not frames:
         return False, "launcher window not found over AT-SPI"
     window = frames[0]["extents"]
-    tiles = [t for t in find(frames[0], role=BUTTON) if t.get("extents")]
+    tiles = [t for t in find(frames[0], role=BUTTON, showing=True) if t.get("extents")]
     problems = []
     for i, tile in enumerate(tiles):
         x, y, w, h = tile["extents"]
@@ -580,6 +599,48 @@ def launcher_geometry(tree):
                 problems.append(f"{tile['name']} overlaps {other['name']}")
     return (len(tiles) >= 2 and not problems,
             f"{len(tiles)} tiles in window {window}; " + ("; ".join(problems) or "no problems"))
+
+
+EXPORTS = "/home/liveuser/.local/share/flatpak/exports/share"
+TEST_APP = "org.staros.TestApp"
+TEST_APP_MARKER = "/tmp/staros-test-app-started"
+
+
+def scenario_installed_app(s):
+    code, out, _ = s.guest(["/usr/bin/sh", "-c",
+                            "pid=$(pgrep -u liveuser -x plasmashell | head -n1); "
+                            "tr '\\0' '\\n' </proc/$pid/environ | grep '^XDG_DATA_DIRS='"])
+    s.check("S18", EXPORTS in out, f"plasmashell's data directories include the Flatpak exports: {out.strip()}")
+    entry = ("[Desktop Entry]\nType=Application\nName=Star Test App\nGenericName=Test game\n"
+             f"Exec=/usr/bin/touch {TEST_APP_MARKER}\nIcon=applications-games\nCategories=Game;\n")
+    path = f"{EXPORTS}/applications/{TEST_APP}.desktop"
+    code, out, err = s.as_user(["/usr/bin/sh", "-c", f"mkdir -p {EXPORTS}/applications && "
+                                f"printf '%b' {shlex.quote(entry)} > {path} && cat {path}"], timeout=30)
+    s.check("S18", code == 0 and "Star Test App" in out, f"exported {path}: {(out + err).strip()[:200]!r}")
+
+    # The open start menu follows the install.
+    s.keys("meta_l")
+    s.wait_focus("text", "Search applications")
+    tree = wait_tree(s, "plasmashell", lambda t: find(t, role=BUTTON, name="Star Test App", showing=True), 60)
+    found = find(tree, role=BUTTON, name="Star Test App", showing=True)
+    s.check("S18", bool(found), "'Recently installed' lists it: "
+            + json.dumps([(n.get("name"), n.get("description")) for n in found]))
+    if found:
+        s.check("S18", str(found[0].get("description", "")).startswith("New."),
+                f"it is marked new: {found[0].get('description')!r}")
+    s.screenshot("S18-installed-app")
+    s.type_text("star test")
+    time.sleep(1)
+    s.keys("ret")
+    code = 1
+    deadline = time.monotonic() + 30
+    while code != 0 and time.monotonic() < deadline:
+        time.sleep(1)
+        code, _, _ = s.guest(["/usr/bin/test", "-e", TEST_APP_MARKER])
+    s.check("S18", code == 0, f"searching 'star test' and Return started it ({TEST_APP_MARKER} exists)")
+    s.check("S18", any(f"STAROS-SHELL launch={TEST_APP}.desktop" in line for line in s.journal_shell()),
+            f"the shell logged 'launch={TEST_APP}.desktop'")
+    s.guest(["/usr/bin/rm", "-f", path])
 
 
 # S11: real scaling under KWin with kscreen-doctor (as the live user).

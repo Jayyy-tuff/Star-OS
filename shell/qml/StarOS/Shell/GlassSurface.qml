@@ -16,6 +16,7 @@ Item {
     property point wallpaperOrigin: Qt.point(0, 0)
     property size screenSize: Qt.size(root.width, root.height)
     property real radius: Theme.glassRadius
+    property real tintOpacity: Theme.glassTintOpacity
 
     // The API is Unknown until the item is in a window; no blur until then.
     readonly property bool blurAvailable: !Theme.reduceTransparency
@@ -76,6 +77,7 @@ Item {
                     blurEnabled: true
                     blur: Theme.glassBlur
                     blurMax: Theme.glassBlurMax
+                    saturation: 0.2
                 }
             }
 
@@ -96,16 +98,26 @@ Item {
                 anchors.fill: parent
                 radius: root.radius
                 color: Theme.glassTint
-                opacity: Theme.glassTintOpacity
-            }
-
-            Rectangle {
-                anchors.fill: parent
-                radius: root.radius
-                color: "transparent"
-                border.width: 1
-                border.color: Theme.glassBorder
+                opacity: root.tintOpacity
             }
         }
+    }
+
+    // A hairline edge, a little lighter along the top, like light on glass.
+    Rectangle {
+        anchors.fill: parent
+        radius: root.radius
+        color: "transparent"
+        border.width: 1
+        border.color: Theme.glassBorder
+    }
+
+    Rectangle {
+        anchors.top: parent.top
+        anchors.topMargin: 1
+        anchors.horizontalCenter: parent.horizontalCenter
+        width: Math.max(0, parent.width - 2 * root.radius)
+        height: 1
+        color: Theme.glassHighlight
     }
 }

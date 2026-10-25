@@ -5,9 +5,10 @@ import QtQuick
 import QtTest
 import StarOS.Shell
 
-// Taskbar: window buttons from a model with libtaskmanager's role names,
-// application icons, keyboard order, signals, the empty list, Escape left to
-// the host, and the visible focus ring.
+// Taskbar (M0.5 floating pill): pinned apps and windows from a model with
+// libtaskmanager's role names, app icons and their marks, the tray, clock and
+// notification buttons, keyboard order, signals, Escape left to the host, and
+// the visible focus ring.
 Item {
     id: root
 
@@ -16,12 +17,16 @@ Item {
 
     property int escapeCount: 0
 
+    readonly property var liveStatus: ({storageMode: "live", storageTotal: 2e9, storageFree: 1.5e9,
+                                        memoryTotal: 4e9, memoryAvailable: 3e9, batteryPresent: false,
+                                        batteryPercent: 0, charging: false})
+
     ListModel {
-        id: windows
+        id: tasks
     }
 
     ListModel {
-        id: sparseWindows
+        id: sparseTasks
 
         ListElement {
             display: "Only a title"
@@ -43,7 +48,7 @@ Item {
             id: taskbar
             anchors.fill: parent
             focus: true
-            tasksModel: windows
+            tasksModel: tasks
         }
     }
 
@@ -60,9 +65,21 @@ Item {
     }
 
     SignalSpy {
-        id: leaveSpy
+        id: quickSettingsSpy
         target: taskbar
-        signalName: "leaveRequested"
+        signalName: "quickSettingsRequested"
+    }
+
+    SignalSpy {
+        id: calendarSpy
+        target: taskbar
+        signalName: "calendarRequested"
+    }
+
+    SignalSpy {
+        id: notificationsSpy
+        target: taskbar
+        signalName: "notificationsRequested"
     }
 
     TestCase {
@@ -71,26 +88,41 @@ Item {
 
         property Item applications
         property ListView list
-        property Item leave
+        property Item tray
+        property Item clock
+        property Item bell
+        property Item pill
 
         function initTestCase() {
+            Theme.animationFactor = 0;
             applications = findChild(taskbar, "applicationsButton");
             list = findChild(taskbar, "openWindows");
-            leave = findChild(taskbar, "leaveButton");
-            verify(applications !== null && list !== null && leave !== null);
+            tray = findChild(taskbar, "trayButton");
+            clock = findChild(taskbar, "clockButton");
+            bell = findChild(taskbar, "notificationButton");
+            pill = findChild(taskbar, "pill");
+            verify(applications && list && tray && clock && bell && pill);
         }
 
         function init() {
-            taskbar.tasksModel = windows;
-            windows.clear();
-            windows.append({display: "Konsole - ~", AppName: "Konsole", AppId: "org.kde.konsole",
-                            IsActive: true});
-            windows.append({display: "", AppName: "System Settings", AppId: "systemsettings",
-                            IsActive: false});
+            taskbar.tasksModel = tasks;
+            taskbar.systemStatus = null;
+            taskbar.unreadNotifications = 0;
+            taskbar.doNotDisturb = false;
+            tasks.clear();
+            // A pinned app without a window, then two windows.
+            tasks.append({display: "Files", AppName: "Files", AppId: "org.staros.files.desktop",
+                          IsActive: false, IsWindow: false});
+            tasks.append({display: "Konsole - ~", AppName: "Konsole", AppId: "org.kde.konsole",
+                          IsActive: true, IsWindow: true});
+            tasks.append({display: "", AppName: "System Settings", AppId: "systemsettings",
+                          IsActive: false, IsWindow: true});
             list.currentIndex = 0;
             launcherSpy.clear();
             activateSpy.clear();
-            leaveSpy.clear();
+            quickSettingsSpy.clear();
+            calendarSpy.clear();
+            notificationsSpy.clear();
             root.escapeCount = 0;
             applications.forceActiveFocus(Qt.TabFocusReason);
             tryVerify(() => applications.activeFocus, 5000, "Applications has focus");
@@ -115,28 +147,57 @@ Item {
             compare(applications.Accessible.name, "Applications");
             compare(applications.Accessible.description, "Open the application launcher");
             compare(list.Accessible.role, Accessible.List);
-            compare(list.Accessible.name, "Open windows");
-            compare(list.Accessible.description, "");
-            compare(leave.Accessible.name, "Leave");
-            compare(leave.Accessible.description, "Log out, restart or shut down");
+            compare(list.Accessible.name, "Apps");
+            compare(tray.Accessible.name, "Quick settings");
+            compare(clock.Accessible.name, "Clock");
+            compare(bell.Accessible.name, "Notifications");
+            compare(bell.Accessible.description, "No new notifications");
         }
 
-        function test_one_button_per_window() {
-            compare(list.count, 2);
-            compare(taskAt(0).Accessible.name, "Konsole - ~");
-            compare(taskAt(0).Accessible.description, "Active window");
-            // An empty title falls back to the application name.
-            compare(taskAt(1).Accessible.name, "System Settings");
-            compare(taskAt(1).Accessible.description, "Window");
-            windows.append({display: "Third", AppName: "Konsole", AppId: "org.kde.konsole",
-                            IsActive: false});
+        // The pill is centred, taskbarGap above the bottom, and its glass
+        // follows its place on the screen.
+        function test_floating_pill() {
+            compare(pill.height, Theme.taskbarPillHeight);
+            compare(pill.y + pill.height, taskbar.height - Theme.taskbarGap);
+            verify(Math.abs(pill.x - (taskbar.width - pill.width) / 2) <= 0.5, "centred: " + pill.x);
+            verify(pill.width < taskbar.width, "the pill floats: " + pill.width);
+            const glass = findChild(pill, "glass");
+            compare(glass.radius, Theme.taskbarRadius);
+            compare(glass.tintOpacity, Theme.taskbarTintOpacity);
+            compare(glass.wallpaperOrigin.x, taskbar.glassOrigin.x + pill.x);
+            compare(glass.wallpaperOrigin.y, taskbar.glassOrigin.y + pill.y);
+            compare(Theme.taskbarHeight, Theme.taskbarPillHeight + Theme.taskbarGap + Theme.taskbarShadowRoom);
+            verify(Theme.taskbarButtonSize >= Theme.minTarget);
+        }
+
+        function test_one_button_per_app_and_window() {
             compare(list.count, 3);
+            compare(taskAt(0).Accessible.name, "Files");
+            compare(taskAt(0).Accessible.description, "Pinned app");
+            compare(taskAt(1).Accessible.name, "Konsole - ~");
+            compare(taskAt(1).Accessible.description, "Active window");
+            // An empty title falls back to the application name.
+            compare(taskAt(2).Accessible.name, "System Settings");
+            compare(taskAt(2).Accessible.description, "Window");
+            tasks.append({display: "Third", AppName: "Konsole", AppId: "org.kde.konsole",
+                          IsActive: false, IsWindow: true});
+            compare(list.count, 4);
         }
 
-        // A model without the AppName and IsActive roles. The view applies
-        // model changes when it lays out, so delegates are awaited.
+        // No mark for a pinned app, a dot for a window, a bar for the active one.
+        function test_marks() {
+            const pinnedMark = findChild(taskAt(0), "indicator");
+            const activeMark = findChild(taskAt(1), "indicator");
+            const windowMark = findChild(taskAt(2), "indicator");
+            verify(!pinnedMark.visible);
+            verify(activeMark.visible && windowMark.visible);
+            verify(activeMark.width > windowMark.width);
+            verify(Qt.colorEqual(activeMark.color, Theme.activeIndicator));
+        }
+
+        // A model without the AppName, IsActive and IsWindow roles.
         function test_missing_roles_are_tolerated() {
-            taskbar.tasksModel = sparseWindows;
+            taskbar.tasksModel = sparseTasks;
             tryVerify(() => taskAt(0) !== null && taskAt(0).Accessible.name === "Only a title",
                       5000, "the delegate shows the title");
             compare(taskAt(0).Accessible.description, "Window");
@@ -144,102 +205,159 @@ Item {
             compare(icon.appId, "");
             verify(findChild(icon, "monogram").visible, "no AppId: the monogram shows");
             compare(findChild(icon, "monogramLetter").text, "O");
-            taskbar.tasksModel = windows;
+            taskbar.tasksModel = tasks;
         }
 
-        // Windows report bare app ids; known ones show Star OS artwork, others
-        // the monogram of the application name.
         function test_task_buttons_show_app_icons() {
-            windows.append({display: "Example - a window", AppName: "Example", AppId: "org.example.app",
-                            IsActive: false});
-            tryVerify(() => taskAt(2) !== null, 5000, "the third task button exists");
-            const ids = ["org.kde.konsole", "systemsettings", "org.example.app"];
+            tasks.append({display: "Example - a window", AppName: "Example", AppId: "org.example.app",
+                          IsActive: false, IsWindow: true});
+            tryVerify(() => taskAt(3) !== null, 5000, "the fourth task button exists");
+            const ids = ["org.staros.files.desktop", "org.kde.konsole", "systemsettings", "org.example.app"];
             for (let row = 0; row < ids.length; ++row) {
                 const icon = findChild(taskAt(row), "icon");
-                verify(icon !== null, "task " + row + " has an icon");
                 compare(icon.appId, ids[row]);
-                verify(icon.width === Theme.taskIconSize && icon.height === Theme.taskIconSize);
+                compare(icon.width, Theme.taskIconSize);
                 verify(icon.height <= taskAt(row).height, "the icon fits the button");
             }
-            const artwork = findChild(findChild(taskAt(0), "icon"), "artwork");
+            const artwork = findChild(findChild(taskAt(1), "icon"), "artwork");
             tryCompare(artwork, "status", Image.Ready, 5000, "Konsole artwork loads");
-            const other = findChild(taskAt(2), "icon");
+            const other = findChild(taskAt(3), "icon");
             verify(findChild(other, "monogram").visible && !findChild(other, "artwork").visible);
             compare(findChild(other, "monogramLetter").text, "E");
         }
 
         function test_arrow_order() {
             keyClick(Qt.Key_Right);
-            expectFocus(taskAt(0), "first task");
+            expectFocus(taskAt(0), "first app");
             keyClick(Qt.Key_Right);
-            expectFocus(taskAt(1), "second task");
+            expectFocus(taskAt(1), "second app");
             keyClick(Qt.Key_Right);
-            expectFocus(leave, "Leave");
+            expectFocus(taskAt(2), "third app");
+            keyClick(Qt.Key_Right);
+            expectFocus(tray, "Quick settings");
+            keyClick(Qt.Key_Right);
+            expectFocus(clock, "Clock");
+            keyClick(Qt.Key_Right);
+            expectFocus(bell, "Notifications");
             keyClick(Qt.Key_Left);
-            expectFocus(taskAt(1), "second task");
+            expectFocus(clock, "Clock");
             keyClick(Qt.Key_Left);
-            expectFocus(taskAt(0), "first task");
+            expectFocus(tray, "Quick settings");
+            keyClick(Qt.Key_Left);
+            expectFocus(taskAt(2), "third app");
+            keyClick(Qt.Key_Left);
+            keyClick(Qt.Key_Left);
             keyClick(Qt.Key_Left);
             expectFocus(applications, "Applications");
         }
 
         function test_tab_order_reaches_every_button() {
             const seen = [];
-            for (let i = 0; i < 4; ++i) {
+            for (let i = 0; i < 6; ++i) {
                 keyClick(Qt.Key_Tab);
                 const item = focused();
                 verify(item !== null && item.visible, "focus is on a visible item");
                 seen.push(item.Accessible.name);
             }
-            verify(seen.indexOf("Konsole - ~") >= 0, "Tab reaches the first task: " + seen);
-            verify(seen.indexOf("System Settings") >= 0, "Tab reaches the second task: " + seen);
-            verify(seen.indexOf("Leave") >= 0, "Tab reaches Leave: " + seen);
+            for (const name of ["Files", "Quick settings", "Clock", "Notifications"]) {
+                verify(seen.indexOf(name) >= 0, "Tab reaches " + name + ": " + seen);
+            }
         }
 
-        function test_return_and_space_activate_tasks() {
+        function test_return_and_space_activate_apps() {
             keyClick(Qt.Key_Right);
             keyClick(Qt.Key_Right);
-            expectFocus(taskAt(1), "second task");
+            keyClick(Qt.Key_Right);
+            expectFocus(taskAt(2), "third app");
             keyClick(Qt.Key_Return);
             compare(activateSpy.count, 1);
-            compare(activateSpy.signalArguments[0][0], 1);
+            compare(activateSpy.signalArguments[0][0], 2);
             keyClick(Qt.Key_Space);
             compare(activateSpy.count, 2);
-            compare(activateSpy.signalArguments[1][0], 1);
+            compare(activateSpy.signalArguments[1][0], 2);
         }
 
-        function test_click_activates_task() {
-            mouseClick(taskAt(1));
+        function test_click_activates_an_app() {
+            mouseClick(taskAt(0));
             compare(activateSpy.count, 1);
-            compare(activateSpy.signalArguments[0][0], 1);
+            compare(activateSpy.signalArguments[0][0], 0);
         }
 
-        function test_applications_and_leave() {
+        function test_buttons_emit_their_requests() {
             keyClick(Qt.Key_Return);
             compare(launcherSpy.count, 1);
-            leave.forceActiveFocus(Qt.TabFocusReason);
-            keyClick(Qt.Key_Space);
-            compare(leaveSpy.count, 1);
             mouseClick(applications);
             compare(launcherSpy.count, 2);
+            mouseClick(tray);
+            compare(quickSettingsSpy.count, 1);
+            mouseClick(clock);
+            compare(calendarSpy.count, 1);
+            bell.forceActiveFocus(Qt.TabFocusReason);
+            keyClick(Qt.Key_Space);
+            compare(notificationsSpy.count, 1);
+        }
+
+        function test_open_panels_check_their_buttons() {
+            verify(!applications.checked && !tray.checked && !clock.checked);
+            taskbar.startMenuOpen = true;
+            taskbar.quickSettingsOpen = true;
+            taskbar.calendarOpen = true;
+            verify(applications.checked && tray.checked && clock.checked);
+            taskbar.startMenuOpen = false;
+            taskbar.quickSettingsOpen = false;
+            taskbar.calendarOpen = false;
+        }
+
+        // The tray describes the session in words.
+        function test_tray_description() {
+            compare(tray.Accessible.description, "");
+            taskbar.systemStatus = root.liveStatus;
+            compare(tray.Accessible.description,
+                    "Live session: changes are lost at shutdown. 1.5 GB free of 2 GB. "
+                    + "Memory: 1 GB of 4 GB in use.");
+            verify(findChild(tray, "networkSymbol").visible);
+            verify(findChild(tray, "volumeSymbol").visible);
+            verify(!findChild(tray, "batterySymbol").visible);
+            taskbar.systemStatus = Object.assign({}, root.liveStatus, {batteryPresent: true, batteryPercent: 64});
+            verify(findChild(tray, "batterySymbol").visible);
+            verify(tray.Accessible.description.endsWith("Battery: 64 %."));
+        }
+
+        function test_clock() {
+            clock.now = new Date(2026, 9, 25, 14, 32, 10);
+            const time = findChild(clock, "time");
+            const date = findChild(clock, "date");
+            verify(time.text.indexOf("32") >= 0, "minutes shown: " + time.text);
+            verify(time.text.indexOf("10") < 0, "no seconds: " + time.text);
+            verify(date.text.indexOf("25") >= 0, "the day: " + date.text);
+            verify(clock.Accessible.description.indexOf("2026") >= 0, clock.Accessible.description);
+            verify(clock.width >= Math.max(time.implicitWidth, date.implicitWidth));
+        }
+
+        function test_notification_badge() {
+            const badge = findChild(bell, "badge");
+            verify(!badge.visible);
+            taskbar.unreadNotifications = 3;
+            verify(badge.visible);
+            compare(bell.Accessible.description, "3 unread");
+            taskbar.doNotDisturb = true;
+            verify(!badge.visible);
+            compare(bell.Accessible.description, "Do not disturb is on");
         }
 
         function test_empty_list_is_never_focused() {
-            windows.clear();
+            tasks.clear();
             compare(list.count, 0);
-            tryCompare(list.Accessible, "description", "No open windows");
             keyClick(Qt.Key_Right);
-            expectFocus(leave, "Leave");
+            expectFocus(tray, "Quick settings");
             keyClick(Qt.Key_Left);
             expectFocus(applications, "Applications");
-            keyClick(Qt.Key_Tab);
-            expectFocus(leave, "Leave");
         }
 
-        function test_focus_returns_when_last_window_closes() {
+        function test_focus_returns_when_the_last_app_goes() {
             keyClick(Qt.Key_Right);
-            expectFocus(taskAt(0), "first task");
-            windows.clear();
+            expectFocus(taskAt(0), "first app");
+            tasks.clear();
             expectFocus(applications, "Applications");
         }
 
@@ -254,7 +372,7 @@ Item {
         function test_focus_ring_visible() {
             waitForRendering(host);
             // Device pixels without a pixel ratio, cropped to the grabbed
-            // item's logical size (see tst_launcher.qml), so the taller root
+            // item's logical size (see tst_startmenu.qml), so the taller root
             // item is grabbed to keep the taskbar inside the crop at 200 %.
             const img = grabImage(root);
             const dpr = Screen.devicePixelRatio;

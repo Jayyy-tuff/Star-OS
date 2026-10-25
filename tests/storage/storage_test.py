@@ -12,7 +12,7 @@ virtio disk. Three boots share it and the OVMF variables file:
      sets systemd-boot's one-shot entry and restarts (QEMU exits: -no-reboot).
   B2 the one-shot entry: cow_label=STAROS_DATA on the kernel command line,
      the copy-on-write space is the scratch disk's ext4 partition, the
-     taskbar's System status says "Star Storage"; a marker file is written
+     taskbar's Quick settings says "Star Storage"; a marker file is written
      in liveuser's home; "Always start with Star Storage" is switched on in
      the app; the guest powers off.
   B3 systemd-boot's default is now Star Storage: the marker is still there.
@@ -153,10 +153,10 @@ def boot2(s, iso, vars_file, disk, name):
     code, out, _ = s.guest(["/usr/bin/findmnt", "-n", "-o", "SOURCE,FSTYPE", "/run/archiso/cowspace"])
     s.check("B2", out.split() == [f"/dev/{name}1", "ext4"],
             f"the copy-on-write space is /dev/{name}1 (ext4): {out.strip()!r}")
-    tree = wait_tree(s, "plasmashell", lambda t: find(t, role=BUTTON, name="System status"), 60)
-    meters = find(tree, role=BUTTON, name="System status")
-    detail = meters[0].get("description", "") if meters else ""
-    s.check("B2", detail.startswith("Star Storage: "), f"'System status' says: {detail!r}")
+    tree = wait_tree(s, "plasmashell", lambda t: find(t, role=BUTTON, name="Quick settings"), 60)
+    trays = find(tree, role=BUTTON, name="Quick settings")
+    detail = trays[0].get("description", "") if trays else ""
+    s.check("B2", detail.startswith("Star Storage: "), f"'Quick settings' says: {detail!r}")
 
     s.guest(["/usr/bin/sh", "-c", f"printf '%s\\n' '{MARKER_TEXT}' >{MARKER} && chown liveuser: {MARKER} && sync"])
     code, out, _ = s.guest(["/usr/bin/cat", MARKER])

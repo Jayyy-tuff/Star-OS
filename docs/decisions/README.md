@@ -31,6 +31,11 @@ release decisions require explicit human approval before they become
 | [0010](0010-sun-store-flatpak.md) | Sun Store installs Flatpak apps from Flathub, per user, after consent | Accepted |
 | [0011](0011-star-storage-persistence.md) | Star Storage keeps the live system's changes on a disk the person erases for it | Accepted (option); live polkit rule awaits owner review |
 | [0012](0012-star-lens.md) | Star Lens reads the screen offline and sends images to Google Lens only when asked | Accepted |
+| [0013](0013-live-application-catalogue.md) | The launcher lists every installed application, live, from KService | Accepted |
+| [0014](0014-shell-desktop-services.md) | The Star OS shell provides notifications, quick settings and clipboard history | Accepted (features); backends await review |
+| [0015](0015-weather-widget-network.md) | The weather widget contacts Open-Meteo only after the person enters a city | Accepted |
+| [0016](0016-look-and-feel-lock-screen.md) | Star OS look and feel: Inter, a dark colour scheme, and a lock screen on the live medium | Accepted |
+| [0017](0017-game-center-and-welcome.md) | Game Center lists installed games and runs them with GameMode; Welcome opens once | Accepted |
 
 ## Template
 

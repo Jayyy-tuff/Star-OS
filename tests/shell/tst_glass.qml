@@ -119,31 +119,30 @@ Item {
             compare(findChild(glass, "glassFallback").visible, !gpu());
         }
 
-        // The taskbar's glass sticks out by a pixel left, right and below, so
-        // only its top edge shows at the screen edges; its wallpaper origin
-        // moves with it.
+        // The taskbar's glass is its floating pill; the wallpaper origin moves
+        // with the pill's place on the screen.
         function test_taskbar_glass_geometry() {
             compare(taskbar.glassOrigin.x, 0);
             compare(taskbar.glassOrigin.y, Screen.height - taskbar.height);
             compare(taskbar.glassScreenSize.width, Screen.width);
             compare(taskbar.glassScreenSize.height, Screen.height);
+            const pill = findChild(taskbar, "pill");
             const surface = findChild(taskbar, "glass");
-            verify(surface !== null);
-            compare(surface.radius, 0);
-            compare(surface.x, -1);
-            compare(surface.y, 0);
-            compare(surface.width, taskbar.width + 2);
-            compare(surface.height, taskbar.height + 1);
-            compare(surface.wallpaperOrigin.x, taskbar.glassOrigin.x - 1);
-            compare(surface.wallpaperOrigin.y, taskbar.glassOrigin.y);
+            verify(pill !== null && surface !== null);
+            compare(surface.radius, Theme.taskbarRadius);
+            compare(surface.width, pill.width);
+            compare(surface.height, pill.height);
+            compare(surface.wallpaperOrigin.x, taskbar.glassOrigin.x + pill.x);
+            compare(surface.wallpaperOrigin.y, taskbar.glassOrigin.y + pill.y);
             compare(surface.screenSize.width, Screen.width);
             compare(surface.screenSize.height, Screen.height);
 
             const placed = createTemporaryObject(taskbarComponent, root,
                 {glassOrigin: Qt.point(12, 700), glassScreenSize: Qt.size(1280, 800)});
+            const placedPill = findChild(placed, "pill");
             const placedGlass = findChild(placed, "glass");
-            compare(placedGlass.wallpaperOrigin.x, 11);
-            compare(placedGlass.wallpaperOrigin.y, 700);
+            compare(placedGlass.wallpaperOrigin.x, 12 + placedPill.x);
+            compare(placedGlass.wallpaperOrigin.y, 700 + placedPill.y);
             compare(placedGlass.screenSize.width, 1280);
             compare(placedGlass.screenSize.height, 800);
         }
@@ -154,9 +153,11 @@ Item {
             }
             waitForRendering(root);
             const img = grabImage(root);
-            // Corners left free by the Applications and Leave buttons.
-            expectColour(img, 1, taskbar.y + 1, Theme.glassFallback, "taskbar top left");
-            expectColour(img, taskbar.width - 2, taskbar.y + 1, Theme.glassFallback, "taskbar top right");
+            const pill = findChild(taskbar, "pill");
+            const p = pill.mapToItem(root, 0, 0);
+            // Inside the pill's padding, clear of its edge line and buttons.
+            expectColour(img, p.x + pill.width / 2, p.y + 3, Theme.glassFallback, "pill top");
+            expectColour(img, p.x + 3, p.y + pill.height / 2, Theme.glassFallback, "pill left");
         }
 
         // Qt's SVG plugin renders the wallpaper, and every rendered colour lies

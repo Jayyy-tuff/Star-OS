@@ -8,13 +8,14 @@ for (const desk of desktopsForActivity(currentActivity())) {
     // org.staros.desktop containment draws the Star OS wallpaper over it.
     desk.wallpaperPlugin = "org.kde.color";
     desk.currentConfigGroup = ["Wallpaper", "org.kde.color", "General"];
-    desk.writeConfig("Color", "#24364a"); // Theme.desktop, until the SVG is drawn
+    desk.writeConfig("Color", "#10123a"); // Theme.desktop, until the SVG is drawn
     desk.locked = true;
 }
 
 const panel = new Panel("org.staros.taskbar");
 panel.location = "bottom";
-panel.height = Math.round(2.5 * gridUnit); // seed; views/Panel.qml applies Theme.taskbarHeight
+// Seed only; views/Panel.qml applies Theme.taskbarHeight (pill, gap and shadow).
+panel.height = Math.round(3.1 * gridUnit) + Math.round(gridUnit / 2) + Math.round(0.75 * gridUnit);
 panel.lengthMode = "fill";
 panel.hiding = "none";
 panel.floating = false; // PanelView floats by default on Wayland

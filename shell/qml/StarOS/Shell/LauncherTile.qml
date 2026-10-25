@@ -2,8 +2,9 @@
 import QtQuick
 import QtQuick.Templates as T
 
-// One application in the launcher: its icon (AppIcon) and name on a glass
-// tile. Screen readers get the name and the generic name.
+// One app in the start menu's grid: its icon over its name, a soft fill on
+// hover and when it is the current item. Screen readers get the name and the
+// generic name.
 T.AbstractButton {
     id: control
 
@@ -12,11 +13,13 @@ T.AbstractButton {
     property string appId: ""
     property var iconData: undefined
     property Component iconFallback: null
+    property bool current: false
 
     text: control.appName
     implicitWidth: Theme.tileWidth
     implicitHeight: Theme.tileHeight
     focusPolicy: Qt.StrongFocus
+    hoverEnabled: true
 
     Accessible.role: Accessible.Button
     Accessible.name: control.appName
@@ -33,7 +36,14 @@ T.AbstractButton {
 
     background: Rectangle {
         radius: Theme.controlRadius
-        color: control.down ? Theme.glassButtonPressed : Theme.tileGlass
+        color: control.down ? Theme.glassButtonPressed
+            : control.hovered || control.activeFocus ? Theme.glassButton : "transparent"
+
+        Behavior on color {
+            ColorAnimation {
+                duration: Theme.durationShort
+            }
+        }
     }
 
     contentItem: Item {
@@ -42,19 +52,27 @@ T.AbstractButton {
             objectName: "icon"
             anchors.horizontalCenter: parent.horizontalCenter
             anchors.top: parent.top
-            anchors.topMargin: Theme.spacing
+            anchors.topMargin: Math.round(Theme.spacing * 1.25)
             width: Theme.tileIconSize
             height: Theme.tileIconSize
             appId: control.appId
             name: control.appName
             iconData: control.iconData
             fallback: control.iconFallback
+            scale: control.down ? 0.94 : control.hovered ? 1.06 : 1
+
+            Behavior on scale {
+                NumberAnimation {
+                    duration: Theme.durationShort
+                    easing.type: Easing.OutCubic
+                }
+            }
         }
 
         Text {
             objectName: "label"
             anchors.top: appIcon.bottom
-            anchors.topMargin: Theme.spacing / 4
+            anchors.topMargin: Math.round(Theme.spacing * 0.6)
             anchors.left: parent.left
             anchors.right: parent.right
             anchors.bottom: parent.bottom
@@ -62,7 +80,8 @@ T.AbstractButton {
             rightPadding: Theme.spacing / 2
             text: control.appName
             color: Theme.text
-            font: Theme.metrics.font
+            font.family: Theme.metrics.font.family
+            font.pixelSize: Theme.smallPixelSize
             horizontalAlignment: Text.AlignHCenter
             verticalAlignment: Text.AlignTop
             wrapMode: Text.Wrap

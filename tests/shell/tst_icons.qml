@@ -106,6 +106,27 @@ Item {
             }
         }
 
+        // Every line symbol and the logo load through Qt's SVG plugin.
+        function test_every_symbol_loads() {
+            verify(Icons.symbols.length >= 40);
+            for (const name of Icons.symbols) {
+                const url = String(Icons.symbol(name));
+                verify(url.endsWith("/StarOS/Shell/symbols/" + name + ".svg"), url);
+                const image = createTemporaryObject(imageComponent, root, {source: url});
+                tryCompare(image, "status", Image.Ready, 5000, name + " symbol loads");
+                compare(image.implicitWidth, image.implicitHeight);
+            }
+            const logo = createTemporaryObject(imageComponent, root, {source: Icons.logo});
+            tryCompare(logo, "status", Image.Ready, 5000, "the logo loads");
+        }
+
+        function test_unknown_symbols() {
+            compare(String(Icons.symbol("no-such-symbol")), "");
+            compare(String(Icons.symbol("")), "");
+            compare(String(Icons.symbol("constructor")), "");
+            compare(String(Icons.symbol(undefined)), "");
+        }
+
         function test_artwork_for_a_known_id() {
             icon.appId = "org.staros.files.desktop";
             icon.name = "Files";

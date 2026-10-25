@@ -5,8 +5,7 @@ import QtQuick
 import QtTest
 import StarOS.Shell
 
-// SystemMeter: what it says for each storage mode, the bars, and its place in
-// the taskbar's keyboard order.
+// SystemMeter: what it says for each storage mode and the bars.
 Item {
     id: root
 
@@ -27,19 +26,6 @@ Item {
         height: 40
     }
 
-    Taskbar {
-        id: taskbar
-        y: 100
-        width: root.width
-        height: Theme.taskbarHeight
-        tasksModel: ListModel {}
-    }
-
-    SignalSpy {
-        id: requestSpy
-        target: taskbar
-        signalName: "systemStatusRequested"
-    }
 
     TestCase {
         name: "SystemMeter"
@@ -47,8 +33,6 @@ Item {
 
         function init() {
             meter.status = root.liveStatus;
-            taskbar.systemStatus = null;
-            requestSpy.clear();
         }
 
         function test_live_session() {
@@ -93,26 +77,6 @@ Item {
             meter.status = null;
             compare(meter.Accessible.description, "Storage: 0 B free of 0 B. Memory: 0 B of 0 B in use.");
             compare(meter.storageUsed, 0);
-        }
-
-        // Hidden without a status; then between the windows and Leave.
-        function test_taskbar_keyboard_order() {
-            const metered = findChild(taskbar, "systemMeter");
-            const apps = findChild(taskbar, "applicationsButton");
-            const leave = findChild(taskbar, "leaveButton");
-            verify(!metered.visible);
-            taskbar.systemStatus = root.liveStatus;
-            verify(metered.visible);
-            apps.forceActiveFocus();
-            keyClick(Qt.Key_Right);
-            verify(metered.activeFocus, "Right from Applications reaches the meter");
-            keyClick(Qt.Key_Right);
-            verify(leave.activeFocus, "then Leave");
-            keyClick(Qt.Key_Left);
-            verify(metered.activeFocus, "Left from Leave returns to the meter");
-            keyClick(Qt.Key_Return);
-            compare(requestSpy.count, 1);
-            verify(metered.x + metered.width <= leave.x, "the meter is left of Leave");
         }
     }
 }

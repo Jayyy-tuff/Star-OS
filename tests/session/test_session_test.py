@@ -63,7 +63,9 @@ class HelperTest(unittest.TestCase):
             return {"role": "application", "children": [
                 {"role": "frame", "name": "Star OS applications", "extents": list(window),
                  "children": [{"role": "push button", "name": n, "extents": list(e),
-                               "children": []} for n, e in tiles]}]}
+                               "states": ["showing", "visible"], "children": []} for n, e in tiles]
+                 + [{"role": "push button", "name": "hidden", "extents": [0, 0, 1920, 1080],
+                     "states": [], "children": []}]}]}
         ok, _ = session_test.launcher_geometry(tree(("A", (36, 117, 162, 126)),
                                                     ("B", (207, 117, 162, 126))))
         self.assertTrue(ok)

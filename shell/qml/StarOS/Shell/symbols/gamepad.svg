@@ -1,0 +1,6 @@
+<!-- SPDX-License-Identifier: CC-BY-SA-4.0 -->
+<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24">
+<g fill="none" stroke="#ffffff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+<path d="M7.2 7 H16.8 C19.1 7 20.9 8.8 21.1 11.1 L21.5 15.6 C21.6 17.4 20.2 18.9 18.4 18.9 C17.4 18.9 16.5 18.4 15.9 17.6 L14.8 16 H9.2 L8.1 17.6 C7.5 18.4 6.6 18.9 5.6 18.9 C3.8 18.9 2.4 17.4 2.5 15.6 L2.9 11.1 C3.1 8.8 4.9 7 7.2 7 Z"/><path d="M7.5 10.2 V13.8 M5.7 12 H9.3"/><circle cx="15.8" cy="11" r="0.9" fill="#ffffff"/><circle cx="17.8" cy="13.2" r="0.9" fill="#ffffff"/>
+</g>
+</svg>

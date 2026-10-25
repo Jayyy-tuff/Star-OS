@@ -2,158 +2,192 @@
 pragma ComponentBehavior: Bound
 
 import QtQuick
+import "status.js" as Status
 
-// The Star OS taskbar: Applications button, open windows, the system meter
-// (when the host gives a status) and the Leave button.
+// The Star OS taskbar (M0.5): a glass pill centred at the bottom of its
+// panel, taskbarGap above the edge, with the Star button, the apps (pinned
+// and open windows, icons only), the tray, the clock and the notifications.
 // It only emits requests; the host (Plasma adapter, or a test) acts on them.
 // Escape is deliberately not handled, so the host panel can restore focus to
 // the previous window.
 FocusScope {
     id: root
 
-    // A model with one row per window and the roles 'display' (title),
-    // 'AppName', 'AppId' and 'IsActive'. Roles may be missing; they are read
+    // One row per pinned app or window, with the roles 'display' (title),
+    // 'AppName', 'AppId', 'decoration', 'IsActive' and 'IsWindow' (false for a
+    // pinned app without a window). Roles may be missing; they are read
     // defensively.
     property var tasksModel: null
-    // Where the taskbar is on its screen, for the glass. The defaults assume a
-    // full-width taskbar at the bottom edge.
+    // Where the taskbar item is on its screen, for the glass. The defaults
+    // assume a full-width panel at the bottom edge.
     property point glassOrigin: Qt.point(0, Screen.height - root.height)
     property size glassScreenSize: Qt.size(Screen.width, Screen.height)
     // Shows an app's own icon when Star OS has no artwork for it (AppIcon).
     property Component iconFallback: null
-    // Storage, memory and battery for the SystemMeter; null hides the meter.
+    // StarOS.System's SystemStatus or a plain object: the tray's description.
     property var systemStatus: null
-
-    readonly property Item afterWindows: systemMeter.visible ? systemMeter : leaveButton
+    // The tray's symbols, chosen by the host.
+    property string networkSymbol: "wired"
+    property string volumeSymbol: "volume"
+    property int unreadNotifications: 0
+    property bool doNotDisturb: false
+    // Which panel is open, for the buttons' checked state.
+    property bool startMenuOpen: false
+    property bool quickSettingsOpen: false
+    property bool calendarOpen: false
 
     signal launcherRequested()
     signal activateRequested(int row)
-    signal leaveRequested()
-    signal systemStatusRequested()
+    signal quickSettingsRequested()
+    signal calendarRequested()
+    signal notificationsRequested()
 
     implicitHeight: Theme.taskbarHeight
-    implicitWidth: 3 * Theme.startButtonWidth
+    implicitWidth: pill.width
 
     Accessible.role: Accessible.ToolBar
     Accessible.name: qsTr("Taskbar")
 
-    // One pixel wider on each side and taller at the bottom, so that at the
-    // screen edges only the top edge line of the glass shows.
-    GlassSurface {
-        objectName: "glass"
-        x: -1
-        y: 0
-        width: root.width + 2
-        height: root.height + 1
-        radius: 0
-        wallpaperOrigin: Qt.point(root.glassOrigin.x - 1, root.glassOrigin.y)
-        screenSize: root.glassScreenSize
-    }
-
-    ShellButton {
-        id: applicationsButton
-        objectName: "applicationsButton"
-        anchors.left: parent.left
-        anchors.leftMargin: Theme.spacing / 2
-        anchors.verticalCenter: parent.verticalCenter
-        width: Theme.startButtonWidth
-        height: root.height - Theme.spacing
-        focus: true
-        text: qsTr("Applications")
-        description: qsTr("Open the application launcher")
-        KeyNavigation.right: openWindows.count > 0 ? openWindows : root.afterWindows
-        onClicked: root.launcherRequested()
-    }
-
-    ListView {
-        id: openWindows
-        objectName: "openWindows"
-        anchors.left: applicationsButton.right
-        anchors.right: systemMeter.visible ? systemMeter.left : leaveButton.left
-        anchors.leftMargin: Theme.spacing
-        anchors.rightMargin: Theme.spacing
-        anchors.top: parent.top
+    Item {
+        id: pill
+        objectName: "pill"
+        anchors.horizontalCenter: parent.horizontalCenter
         anchors.bottom: parent.bottom
-        orientation: ListView.Horizontal
-        spacing: Theme.spacing / 2
-        clip: true
-        model: root.tasksModel
-        activeFocusOnTab: count > 0
-        keyNavigationEnabled: true
-        highlightMoveDuration: 0
-        boundsBehavior: Flickable.StopAtBounds
-        interactive: contentWidth > width
+        anchors.bottomMargin: Theme.taskbarGap
+        width: Math.min(root.width, row.width + 2 * pill.padding)
+        height: Theme.taskbarPillHeight
 
-        // Arrow keys move within the list first; at either end they move on.
-        KeyNavigation.priority: KeyNavigation.AfterItem
-        KeyNavigation.left: applicationsButton
-        KeyNavigation.right: root.afterWindows
+        readonly property int padding: Math.round((Theme.taskbarPillHeight - Theme.taskbarButtonSize) / 2)
 
-        Accessible.role: Accessible.List
-        Accessible.name: qsTr("Open windows")
-        Accessible.description: count === 0 ? qsTr("No open windows") : ""
-
-        // Buttons shrink to share the space, down to two target sizes, and the
-        // list scrolls beyond that.
-        readonly property real buttonWidth: count === 0 ? Theme.taskButtonWidth
-            : Math.max(2 * Theme.minTarget,
-                       Math.min(Theme.taskButtonWidth, (width - (count - 1) * spacing) / count))
-
-        delegate: TaskButton {
-            id: task
-
-            required property var model
-            required property int index
-
-            width: openWindows.buttonWidth
-            height: openWindows.height - Theme.spacing
-            y: Theme.spacing / 2
-            title: task.model.display ?? ""
-            appName: task.model.AppName ?? ""
-            appId: task.model.AppId ?? ""
-            iconData: task.model.decoration
-            iconFallback: root.iconFallback
-            isActive: task.model.IsActive === true
-            onClicked: {
-                openWindows.currentIndex = task.index;
-                root.activateRequested(task.index);
-            }
+        Shadow {
+            anchors.fill: parent
+            radius: Theme.taskbarRadius
         }
 
-        onCountChanged: {
-            if (count === 0 && activeFocus) {
-                applicationsButton.forceActiveFocus(Qt.TabFocusReason);
+        GlassSurface {
+            objectName: "glass"
+            anchors.fill: parent
+            radius: Theme.taskbarRadius
+            tintOpacity: Theme.taskbarTintOpacity
+            wallpaperOrigin: Qt.point(root.glassOrigin.x + pill.x, root.glassOrigin.y + pill.y)
+            screenSize: root.glassScreenSize
+        }
+
+        Row {
+            id: row
+            anchors.centerIn: parent
+            spacing: Math.round(Theme.spacing / 3)
+
+            // Everything but the apps, for the apps' share of the width.
+            readonly property real fixedWidth: startButton.width + trayButton.width + clockButton.width
+                + notificationButton.width + 2 * separatorLeft.width + 6 * spacing
+
+            StartButton {
+                id: startButton
+                objectName: "applicationsButton"
+                focus: true
+                checked: root.startMenuOpen
+                KeyNavigation.right: apps.count > 0 ? apps : trayButton
+                onClicked: root.launcherRequested()
+            }
+
+            Rectangle {
+                id: separatorLeft
+                anchors.verticalCenter: parent.verticalCenter
+                width: 1
+                height: Math.round(Theme.taskbarButtonSize * 0.55)
+                color: Theme.glassBorder
+                visible: apps.count > 0
+            }
+
+            ListView {
+                id: apps
+                objectName: "openWindows"
+                width: Math.min(apps.contentWidth, Math.max(0, root.width - 2 * pill.padding - row.fixedWidth))
+                height: Theme.taskbarButtonSize
+                orientation: ListView.Horizontal
+                spacing: row.spacing
+                clip: true
+                model: root.tasksModel
+                activeFocusOnTab: count > 0
+                keyNavigationEnabled: true
+                highlightMoveDuration: 0
+                boundsBehavior: Flickable.StopAtBounds
+                interactive: contentWidth > width
+                visible: count > 0
+
+                // Arrow keys move within the list first; at either end they move on.
+                KeyNavigation.priority: KeyNavigation.AfterItem
+                KeyNavigation.left: startButton
+                KeyNavigation.right: trayButton
+
+                Accessible.role: Accessible.List
+                Accessible.name: qsTr("Apps")
+
+                delegate: TaskButton {
+                    id: task
+
+                    required property var model
+                    required property int index
+
+                    title: task.model.display ?? ""
+                    appName: task.model.AppName ?? ""
+                    appId: task.model.AppId ?? ""
+                    iconData: task.model.decoration
+                    iconFallback: root.iconFallback
+                    isActive: task.model.IsActive === true
+                    isWindow: task.model.IsWindow !== false
+                    onClicked: {
+                        apps.currentIndex = task.index;
+                        root.activateRequested(task.index);
+                    }
+                }
+
+                onCountChanged: {
+                    if (count === 0 && activeFocus) {
+                        startButton.forceActiveFocus(Qt.TabFocusReason);
+                    }
+                }
+            }
+
+            Rectangle {
+                anchors.verticalCenter: parent.verticalCenter
+                width: 1
+                height: separatorLeft.height
+                color: Theme.glassBorder
+            }
+
+            TrayButton {
+                id: trayButton
+                objectName: "trayButton"
+                checked: root.quickSettingsOpen
+                networkSymbol: root.networkSymbol
+                volumeSymbol: root.volumeSymbol
+                batteryPresent: root.systemStatus ? root.systemStatus.batteryPresent === true : false
+                batteryPercent: Status.value(root.systemStatus, "batteryPercent")
+                description: Status.summary(root.systemStatus)
+                KeyNavigation.left: apps.count > 0 ? apps : startButton
+                KeyNavigation.right: clockButton
+                onClicked: root.quickSettingsRequested()
+            }
+
+            ClockButton {
+                id: clockButton
+                objectName: "clockButton"
+                checked: root.calendarOpen
+                KeyNavigation.left: trayButton
+                KeyNavigation.right: notificationButton
+                onClicked: root.calendarRequested()
+            }
+
+            NotificationButton {
+                id: notificationButton
+                objectName: "notificationButton"
+                unreadCount: root.unreadNotifications
+                doNotDisturb: root.doNotDisturb
+                KeyNavigation.left: clockButton
+                onClicked: root.notificationsRequested()
             }
         }
-    }
-
-    SystemMeter {
-        id: systemMeter
-        objectName: "systemMeter"
-        anchors.right: leaveButton.left
-        anchors.rightMargin: Theme.spacing / 2
-        anchors.verticalCenter: parent.verticalCenter
-        width: Math.min(implicitWidth, 10 * Theme.gridUnit)
-        height: root.height - Theme.spacing
-        visible: root.systemStatus !== null
-        status: root.systemStatus
-        KeyNavigation.left: openWindows.count > 0 ? openWindows : applicationsButton
-        KeyNavigation.right: leaveButton
-        onClicked: root.systemStatusRequested()
-    }
-
-    ShellButton {
-        id: leaveButton
-        objectName: "leaveButton"
-        anchors.right: parent.right
-        anchors.rightMargin: Theme.spacing / 2
-        anchors.verticalCenter: parent.verticalCenter
-        width: Math.max(Theme.minTarget * 2, implicitWidth)
-        height: root.height - Theme.spacing
-        text: qsTr("Leave")
-        description: qsTr("Log out, restart or shut down")
-        KeyNavigation.left: systemMeter.visible ? systemMeter
-                           : openWindows.count > 0 ? openWindows : applicationsButton
-        onClicked: root.leaveRequested()
     }
 }

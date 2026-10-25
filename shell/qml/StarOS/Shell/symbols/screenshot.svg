@@ -1,0 +1,6 @@
+<!-- SPDX-License-Identifier: CC-BY-SA-4.0 -->
+<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24">
+<g fill="none" stroke="#ffffff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+<path d="M4 8 V6 C4 4.9 4.9 4 6 4 H8 M16 4 H18 C19.1 4 20 4.9 20 6 V8 M20 16 V18 C20 19.1 19.1 20 18 20 H16 M8 20 H6 C4.9 20 4 19.1 4 18 V16"/><circle cx="12" cy="12" r="3"/>
+</g>
+</svg>

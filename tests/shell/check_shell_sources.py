@@ -12,7 +12,9 @@
   to what Qt's SVG renderer draws (no filters, masks, clip paths, patterns,
   images, text or CSS), and stays under its size limit; the icons are the seven
   256x256 Star OS icons; every wallpaper colour lies between Theme.qml's
-  wallpaperDarkest and wallpaperLightest, channel by channel, and both are used.
+  wallpaperDarkest and wallpaperLightest, channel by channel, and both are used;
+  the symbols (M0.5) are 24x24, white only, and exactly the names Icons.qml
+  lists; the logo is brand/star.svg, 64x64.
 
 Prints one CHECK line per check. Exit status 0 if all passed, 1 otherwise.
 """
@@ -36,6 +38,10 @@ ICONS = {"terminal.svg", "settings.svg", "files.svg", "sun-store.svg", "moon-bro
 ICON_LIMIT = 8 * 1024
 WALLPAPER = os.path.join(MODULE, "wallpaper", "star-os-glass.svg")
 WALLPAPER_LIMIT = 64 * 1024
+SYMBOLS = os.path.join(MODULE, "symbols")
+SYMBOL_LIMIT = 2 * 1024
+LOGO = os.path.join(MODULE, "brand", "star.svg")
+LOGO_LIMIT = 4 * 1024
 # Elements and attributes outside what the M0.3 artwork may use.
 SVG_ELEMENTS = {"svg", "defs", "g", "path", "rect", "circle", "ellipse", "line", "polyline",
                 "polygon", "linearGradient", "radialGradient", "stop"}
@@ -189,6 +195,36 @@ def theme_colour(name):
     return hex_colour(match.group(1)) if match else None
 
 
+def listed_symbols():
+    with open(os.path.join(MODULE, "Icons.qml"), encoding="utf-8") as f:
+        text = f.read()
+    match = re.search(r"property var symbols: \[(.*?)\]", text, re.S)
+    return set(re.findall(r'"([a-z-]+)"', match.group(1))) if match else set()
+
+
+def check_symbols():
+    problems = []
+    names = {n[:-4] for n in os.listdir(SYMBOLS) if n.endswith(".svg")} if os.path.isdir(SYMBOLS) else set()
+    listed = listed_symbols()
+    if names != listed:
+        problems.append(f"symbols/ has {sorted(names - listed)} not in Icons.qml, "
+                        f"Icons.qml lists {sorted(listed - names)} without a file")
+    for name in sorted(names):
+        path = os.path.join(SYMBOLS, name + ".svg")
+        found, root = check_svg(path, SYMBOL_LIMIT)
+        problems += found
+        if root is None:
+            continue
+        if root.get("viewBox") != "0 0 24 24":
+            problems.append(f"{rel(path)}: viewBox is not '0 0 24 24'")
+        for element in root.iter():
+            for attribute in ("fill", "stroke"):
+                value = element.get(attribute)
+                if value not in (None, "none", "#ffffff"):
+                    problems.append(f"{rel(path)}: {attribute}={value!r}; symbols are white")
+    return problems
+
+
 def check_artwork():
     problems = []
     icon_dir = os.path.join(MODULE, "icons")
@@ -200,9 +236,18 @@ def check_artwork():
         problems += found
         if root is not None and root.get("viewBox") != "0 0 256 256":
             problems.append(f"StarOS.Shell/icons/{name}: viewBox is not '0 0 256 256'")
+    artwork_dirs = (icon_dir, os.path.dirname(WALLPAPER), SYMBOLS, os.path.dirname(LOGO))
     for path in shell_files():
-        if path.endswith(".svg") and os.path.dirname(path) not in (icon_dir, os.path.dirname(WALLPAPER)):
-            problems.append(f"{rel(path)}: artwork belongs in StarOS.Shell/icons or wallpaper")
+        if path.endswith(".svg") and os.path.dirname(path) not in artwork_dirs:
+            problems.append(f"{rel(path)}: artwork belongs in StarOS.Shell/icons, symbols, brand or wallpaper")
+    problems += check_symbols()
+    if not os.path.isfile(LOGO):
+        problems.append(f"{rel(LOGO)} is missing")
+    else:
+        found, root = check_svg(LOGO, LOGO_LIMIT)
+        problems += found
+        if root is not None and root.get("viewBox") != "0 0 64 64":
+            problems.append(f"{rel(LOGO)}: viewBox is not '0 0 64 64'")
     if not os.path.isfile(WALLPAPER):
         return problems + [f"{rel(WALLPAPER)} is missing"]
     found, root = check_svg(WALLPAPER, WALLPAPER_LIMIT)

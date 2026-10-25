@@ -48,3 +48,6 @@ staros-storage
 staros-lens
 tesseract
 tesseract-data-eng
+# M0.5 (docs/architecture/m05-deep-space-design.md, ADR-0016): Inter as the
+# system UI font.
+inter-font

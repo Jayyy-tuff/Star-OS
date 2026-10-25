@@ -223,8 +223,9 @@ app_entries_valid() {
     done
 }
 
-# Desktop files of the launcher's catalogue (AppCatalogue.qml) that the
-# image must have, so a renamed desktop file is noticed.
+# Desktop files of the apps pinned in the taskbar and the start menu (the
+# taskbar plasmoid's main.qml) that the image must have, so a renamed desktop
+# file is noticed; the start menu itself lists every installed app (ADR-0013).
 catalogue_apps=(
     org.kde.konsole systemsettings org.staros.files org.staros.sunstore org.staros.lens
     org.staros.storage firefox vlc org.kde.okular org.kde.gwenview org.kde.ark org.kde.kwrite org.kde.kcalc
@@ -239,6 +240,14 @@ catalogue_apps_present() {
         missing=1
     done
     ((missing == 0))
+}
+
+# Inter is the UI font of KDE apps and the shell, and fontconfig's
+# sans-serif (ADR-0016).
+inter_ui_font() {
+    pacman_root -Q inter-font >/dev/null 2>&1 \
+        && grep -qx 'font=Inter,10,-1,5,400,0,0,0,0,0,0,0,0,0,0,1' "$root/etc/xdg/kdeglobals" \
+        && grep -q '<family>Inter</family>' "$root/etc/fonts/local.conf"
 }
 
 star_os_system_module() {
@@ -335,8 +344,9 @@ check "Files, Sun Store, Star Lens and Star Storage desktop entries pass desktop
 check "the Star Storage helper is root's only through its polkit action" storage_helper_and_polkit
 check "Star Lens has KWin's screenshot grant, its shortcut and English OCR data" lens_screenshot_grant
 check "staros-sunstore ships Flathub's remote file" flathub_file_shipped
-check "the launcher's catalogue apps have their desktop files" catalogue_apps_present
+check "the pinned apps have their desktop files" catalogue_apps_present
 check "StarOS.System is installed by staros-system" star_os_system_module
+check "Inter is the UI font" inter_ui_font
 check "no system-wide Flatpak remote" no_system_flatpak_remote
 check "the image's pacman configuration has no [staros] build repository" no_build_repository
 info_present

@@ -2,8 +2,10 @@
 import QtQuick
 import QtQuick.Templates as T
 
-// One open window in the taskbar: a small application icon and the title. The
-// label elides; the full title stays in the accessible name.
+// One app in the taskbar: its icon only. A pinned app that is not running
+// has no mark; a running one a dot below; the active window a wider bar in
+// the indicator colour. The accessible name is the window title (or the app
+// name), the description its state.
 T.AbstractButton {
     id: control
 
@@ -13,15 +15,19 @@ T.AbstractButton {
     property var iconData: undefined
     property Component iconFallback: null
     property bool isActive: false
+    // False for a pinned app that has no window.
+    property bool isWindow: true
 
     text: control.title !== "" ? control.title : control.appName
-    implicitWidth: Theme.taskButtonWidth
-    implicitHeight: Theme.minTarget
+    implicitWidth: Theme.taskbarButtonSize
+    implicitHeight: Theme.taskbarButtonSize
     focusPolicy: Qt.StrongFocus
+    hoverEnabled: true
 
     Accessible.role: Accessible.Button
     Accessible.name: control.text
-    Accessible.description: control.isActive ? qsTr("Active window") : qsTr("Window")
+    Accessible.description: !control.isWindow ? qsTr("Pinned app")
+        : control.isActive ? qsTr("Active window") : qsTr("Window")
 
     Keys.onReturnPressed: event => {
         control.clicked();
@@ -35,16 +41,14 @@ T.AbstractButton {
     background: Rectangle {
         radius: Theme.controlRadius
         color: control.down ? Theme.glassButtonPressed
-            : control.isActive ? Theme.glassButtonActive : Theme.glassButton
+            : control.isActive ? Theme.glassButtonActive
+            : control.hovered ? Theme.glassButton
+            : control.isWindow ? Theme.tileGlass : "transparent"
 
-        Rectangle {
-            visible: control.isActive
-            anchors.horizontalCenter: parent.horizontalCenter
-            anchors.bottom: parent.bottom
-            width: parent.width - 2 * Theme.controlRadius
-            height: Theme.activeIndicatorHeight
-            radius: height / 2
-            color: Theme.activeIndicator
+        Behavior on color {
+            ColorAnimation {
+                duration: Theme.durationShort
+            }
         }
     }
 
@@ -52,31 +56,41 @@ T.AbstractButton {
         AppIcon {
             id: appIcon
             objectName: "icon"
-            anchors.left: parent.left
-            anchors.leftMargin: Theme.spacing
-            anchors.verticalCenter: parent.verticalCenter
+            anchors.centerIn: parent
+            anchors.verticalCenterOffset: -Math.round(Theme.activeIndicatorHeight / 2)
             width: Theme.taskIconSize
             height: Theme.taskIconSize
             appId: control.appId
             iconData: control.iconData
             fallback: control.iconFallback
             name: control.appName !== "" ? control.appName : control.title
-        }
+            scale: control.down ? 0.92 : control.hovered ? 1.08 : 1
 
-        Text {
-            objectName: "label"
-            anchors.left: appIcon.right
-            anchors.right: parent.right
-            anchors.top: parent.top
-            anchors.bottom: parent.bottom
-            leftPadding: Theme.spacing / 2
-            rightPadding: Theme.spacing
-            text: control.text
-            color: Theme.text
-            font: Theme.metrics.font
-            elide: Text.ElideRight
-            verticalAlignment: Text.AlignVCenter
-            Accessible.ignored: true
+            Behavior on scale {
+                NumberAnimation {
+                    duration: Theme.durationShort
+                    easing.type: Easing.OutCubic
+                }
+            }
+        }
+    }
+
+    Rectangle {
+        objectName: "indicator"
+        anchors.horizontalCenter: parent.horizontalCenter
+        anchors.bottom: parent.bottom
+        anchors.bottomMargin: Math.round(Theme.activeIndicatorHeight / 2)
+        visible: control.isWindow
+        height: Theme.activeIndicatorHeight
+        width: control.isActive ? Math.round(0.9 * Theme.gridUnit) : Theme.activeIndicatorHeight + 2
+        radius: height / 2
+        color: control.isActive ? Theme.activeIndicator : Theme.textTertiary
+
+        Behavior on width {
+            NumberAnimation {
+                duration: Theme.durationShort
+                easing.type: Easing.OutCubic
+            }
         }
     }
 
