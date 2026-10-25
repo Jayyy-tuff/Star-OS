@@ -288,6 +288,19 @@ storage_helper_and_polkit() {
     fi
 }
 
+# Quick settings' Wi-Fi (ADR-0014): the live-only D-Bus rule lets liveuser,
+# and nobody else, talk to iwd; it allows nothing else.
+live_iwd_policy() {
+    local file="$root/etc/dbus-1/system.d/staros-live-iwd.conf"
+    [[ -f $file ]] || { echo "    /etc/dbus-1/system.d/staros-live-iwd.conf is missing"; return 1; }
+    if [[ $(grep -c '<allow ' "$file") -ne 1 || $(grep -c '<policy ' "$file") -ne 1 ]] \
+        || ! grep -q '<allow send_destination="net.connman.iwd"/>' "$file" \
+        || ! grep -q '<policy user="liveuser">' "$file"; then
+        echo "    the live iwd rule allows more than iwd for liveuser"
+        return 1
+    fi
+}
+
 flathub_file_shipped() {
     local file="$root/usr/share/staros-sunstore/flathub.flatpakrepo"
     [[ -f $file ]] && grep -qx '\[Flatpak Repo\]' "$file" \
@@ -343,6 +356,7 @@ check "staros-files, -sunstore, -lens and -storage are installed" star_os_apps_i
 check "Files, Sun Store, Star Lens and Star Storage desktop entries pass desktop-file-validate" app_entries_valid
 check "the Star Storage helper is root's only through its polkit action" storage_helper_and_polkit
 check "Star Lens has KWin's screenshot grant, its shortcut and English OCR data" lens_screenshot_grant
+check "the live iwd D-Bus rule allows only iwd, only for liveuser" live_iwd_policy
 check "staros-sunstore ships Flathub's remote file" flathub_file_shipped
 check "the pinned apps have their desktop files" catalogue_apps_present
 check "StarOS.System is installed by staros-system" star_os_system_module

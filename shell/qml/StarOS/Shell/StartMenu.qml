@@ -69,7 +69,10 @@ FocusScope {
         root.view = "home";
         root.now = new Date();
         powerMenu.shown = false;
+        pinned.currentIndex = 0;
+        recent.currentIndex = 0;
         results.currentIndex = 0;
+        allApps.currentIndex = 0;
         searchField.forceActiveFocus(Qt.OtherFocusReason);
     }
 
@@ -112,6 +115,28 @@ FocusScope {
             return true;
         }
         return false;
+    }
+
+    // Down or Tab in the search field: into the matches, all apps, the
+    // pinned apps or the recently installed ones.
+    // Returns whether the focus moved.
+    function enterList() {
+        let list = null;
+        if (answerCard.visible) {
+            list = null;
+        } else if (root.searching) {
+            list = results.count > 0 ? results : null;
+        } else if (root.view === "all") {
+            list = allApps;
+        } else if (pinned.count > 0) {
+            list = pinned;
+        } else if (recent.visible && recent.count > 0) {
+            list = recent;
+        }
+        if (list) {
+            list.forceActiveFocus(Qt.TabFocusReason);
+        }
+        return list !== null;
     }
 
     function showView(name) {
@@ -258,25 +283,23 @@ FocusScope {
                 }
             }
 
+            // From the text itself: the bindings that depend on it may not
+            // have been updated yet.
             onTextChanged: {
+                const text = searchField.text;
+                const searchable = text.trim() !== "" && !/^\s*note:/i.test(text);
                 if (root.catalogue) {
-                    root.catalogue.filter = root.searching ? searchField.text : "";
+                    root.catalogue.filter = searchable ? text : "";
                 }
                 results.currentIndex = 0;
             }
 
+            // Tab goes on along the panel when there is no list to enter.
+            Keys.onTabPressed: event => {
+                event.accepted = root.enterList();
+            }
             Keys.onDownPressed: event => {
-                if (root.searching) {
-                    if (results.count > 0) {
-                        results.forceActiveFocus(Qt.TabFocusReason);
-                    }
-                } else if (root.view === "all") {
-                    allApps.forceActiveFocus(Qt.TabFocusReason);
-                } else if (pinned.count > 0) {
-                    pinned.forceActiveFocus(Qt.TabFocusReason);
-                } else if (recent.count > 0) {
-                    recent.forceActiveFocus(Qt.TabFocusReason);
-                }
+                root.enterList();
                 event.accepted = true;
             }
             Keys.onReturnPressed: event => {
@@ -506,7 +529,7 @@ FocusScope {
                     Accessible.role: Accessible.List
                     Accessible.name: qsTr("Recently installed")
 
-                    delegate: AppRow {
+                    delegate: LauncherRow {
                         id: recentRow
 
                         required property var modelData
@@ -630,7 +653,7 @@ FocusScope {
                         Accessible.name: text
                     }
 
-                    delegate: AppRow {
+                    delegate: LauncherRow {
                         id: allRow
 
                         required property var model
@@ -682,7 +705,7 @@ FocusScope {
                     Accessible.role: Accessible.List
                     Accessible.name: qsTr("Applications")
 
-                    delegate: AppRow {
+                    delegate: LauncherRow {
                         id: resultRow
 
                         required property var model

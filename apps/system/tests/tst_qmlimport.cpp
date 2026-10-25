@@ -32,6 +32,9 @@ QtObject {
     property string mode: status.storageMode
     property ApplicationsModel apps: ApplicationsModel { filter: "zz-no-such-app" }
     property int matches: apps.count
+    property NetworkStatus network: NetworkStatus { interval: 0 }
+    property DisplayControl display: DisplayControl {}
+    property string networkState: network.state
 }
 )",
                           QUrl());
@@ -40,6 +43,7 @@ QtObject {
         QVERIFY(!object->property("mode").toString().isEmpty());
         QVERIFY(object->property("notes").toInt() >= 0);
         QCOMPARE(object->property("matches").toInt(), 0);
+        QVERIFY(!object->property("networkState").toString().isEmpty());
     }
 };
 

@@ -20,8 +20,14 @@ ClockButton 1.0 ClockButton.qml
 NotificationButton 1.0 NotificationButton.qml
 Taskbar 1.0 Taskbar.qml
 LauncherTile 1.0 LauncherTile.qml
-AppRow 1.0 AppRow.qml
+LauncherRow 1.0 LauncherRow.qml
 StartMenu 1.0 StartMenu.qml
+QuickToggle 1.0 QuickToggle.qml
+QuickSlider 1.0 QuickSlider.qml
+QuickSettings 1.0 QuickSettings.qml
+NotificationCard 1.0 NotificationCard.qml
+NotificationToasts 1.0 NotificationToasts.qml
+CalendarPanel 1.0 CalendarPanel.qml
 SystemMeter 1.0 SystemMeter.qml
 StickyNote 1.0 StickyNote.qml
 NotesBoard 1.0 NotesBoard.qml

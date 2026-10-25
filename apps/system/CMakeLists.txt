@@ -3,7 +3,8 @@
 # StarOS.System (M0.4, docs/architecture/m04-apps-lens-storage-design.md
 # section 3): a QML module for the shell and the apps with the system status
 # (storage mode and space, memory, battery) and the sticky notes store. M0.5
-# (docs/architecture/m05-deep-space-design.md) adds the applications model.
+# (docs/architecture/m05-deep-space-design.md) adds the applications model
+# and, for quick settings, sound, display and network.
 # Installed as a plugin in Qt's QML directory, next to StarOS.Shell.
 
 cmake_minimum_required(VERSION 3.22)
@@ -22,8 +23,9 @@ include(KDECMakeSettings)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-find_package(Qt6 ${QT_MIN_VERSION} REQUIRED COMPONENTS Core Qml)
-find_package(KF6 ${KF_MIN_VERSION} REQUIRED COMPONENTS KIO Service)
+find_package(Qt6 ${QT_MIN_VERSION} REQUIRED COMPONENTS Core DBus Gui Qml)
+find_package(KF6 ${KF_MIN_VERSION} REQUIRED COMPONENTS Config GlobalAccel KIO Service)
+find_package(KF6PulseAudioQt REQUIRED)
 
 qt_policy(SET QTP0001 NEW)
 

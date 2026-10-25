@@ -6,15 +6,18 @@ import org.kde.plasma.plasmoid
 import org.kde.plasma.core as PlasmaCore
 import org.kde.plasma.workspace.dbus as DBus
 import org.kde.taskmanager as TaskManager
+import org.kde.notificationmanager as NotificationManager
 import org.kde.kirigami as Kirigami
 import StarOS.Shell
 import StarOS.System
 
 // Plasma adapter of the Star OS taskbar (M0.2, ADR-0008; M0.5 floating
-// taskbar). This file and LauncherWindow.qml are the only Star OS QML in the
-// taskbar that imports Plasma or KDE modules; every visible element comes
-// from the Plasma-free StarOS.Shell module. StarOS.System gives the
-// applications (ADR-0013) and the system status.
+// taskbar, ADR-0013, ADR-0014). This file, ShellOverlay.qml and
+// ToastWindow.qml are the only Star OS QML in the taskbar that imports
+// Plasma or KDE modules; every visible element comes from the Plasma-free
+// StarOS.Shell module. StarOS.System gives the applications, the system
+// status, sound, display and network; libnotificationmanager makes the shell
+// the notification server.
 //
 // The window list uses plasmashell's packaged window-management grant
 // (org.kde.plasmashell.desktop); nothing here bypasses KWin's permission checks.
@@ -49,6 +52,7 @@ ContainmentItem {
         "org.kde.ark.desktop",
         "org.staros.welcome.desktop"
     ]
+    readonly property bool doNotDisturb: notificationSettings.notificationsInhibitedUntil > new Date()
 
     Plasmoid.backgroundHints: PlasmaCore.Types.NoBackground
 
@@ -61,6 +65,58 @@ ContainmentItem {
 
     SystemStatus {
         id: systemStatus
+    }
+
+    AudioControl {
+        id: audio
+        keysEnabled: true
+        onChanged: console.info("STAROS-SHELL volume=" + (available ? volume : "none") + " muted=" + muted)
+    }
+
+    DisplayControl {
+        id: displayControl
+        onNightLightChanged: console.info("STAROS-SHELL nightlight=" + nightLight + " available=" + nightLightAvailable)
+    }
+
+    NetworkStatus {
+        id: network
+        onChanged: console.info("STAROS-SHELL network=" + state + " kind=" + kind)
+    }
+
+    // Do not disturb, the apps that may not pop up, and what was read.
+    NotificationManager.Settings {
+        id: notificationSettings
+    }
+
+    // New notifications for the toasts.
+    NotificationManager.Notifications {
+        id: popups
+        limit: 3
+        showExpired: false
+        showDismissed: false
+        showJobs: false
+        blacklistedDesktopEntries: notificationSettings.popupBlacklistedApplications
+        blacklistedNotifyRcNames: notificationSettings.popupBlacklistedServices
+        urgencies: root.doNotDisturb ? NotificationManager.Notifications.CriticalUrgency
+            : NotificationManager.Notifications.NormalUrgency | NotificationManager.Notifications.CriticalUrgency
+        sortMode: NotificationManager.Notifications.SortByDate
+        sortOrder: Qt.DescendingOrder
+        groupMode: NotificationManager.Notifications.GroupDisabled
+        onCountChanged: console.info("STAROS-SHELL toasts=" + count)
+    }
+
+    // Every notification of this session, for the notification centre.
+    NotificationManager.Notifications {
+        id: history
+        showExpired: true
+        showDismissed: true
+        showJobs: false
+        blacklistedDesktopEntries: notificationSettings.historyBlacklistedApplications
+        blacklistedNotifyRcNames: notificationSettings.historyBlacklistedServices
+        sortMode: NotificationManager.Notifications.SortByDate
+        sortOrder: Qt.DescendingOrder
+        groupMode: NotificationManager.Notifications.GroupDisabled
+        onCountChanged: console.info("STAROS-SHELL notifications=" + count)
     }
 
     // Pinned apps and windows: a running pinned app takes its pin's place;
@@ -96,13 +152,25 @@ ContainmentItem {
         tasksModel: tasks
         iconFallback: themeIcon
         systemStatus: systemStatus
-        startMenuOpen: launcherWindow.visible
+        networkSymbol: Status.networkSymbol(network)
+        volumeSymbol: Status.volumeSymbol(audio)
+        trayDetail: [
+            qsTr("Network: %1.").arg(Status.networkText(network)),
+            audio.available ? (audio.muted ? qsTr("Sound is muted.") : qsTr("Volume: %1 %.").arg(audio.volume)) : ""
+        ].filter(part => part !== "").join(" ")
+        unreadNotifications: history.unreadNotificationsCount
+        doNotDisturb: root.doNotDisturb
+        startMenuOpen: overlay.open && overlay.panel === "start"
+        quickSettingsOpen: overlay.open && overlay.panel === "quick"
+        calendarOpen: overlay.open && overlay.panel === "calendar"
         // The panel spans the bottom edge of its screen (layout.js).
         glassOrigin: Qt.point(0, Screen.height - taskbar.height)
         glassScreenSize: Qt.size(Screen.width, Screen.height)
 
-        onLauncherRequested: launcherWindow.toggleLauncher()
-        onQuickSettingsRequested: applications.launchDesktopId("org.staros.storage.desktop")
+        onLauncherRequested: overlay.toggle("start")
+        onQuickSettingsRequested: overlay.toggle("quick")
+        onCalendarRequested: overlay.toggle("calendar")
+        onNotificationsRequested: overlay.toggle("calendar")
         onActivateRequested: row => {
             const idx = tasks.makeModelIndex(row);
             if (tasks.data(idx, TaskManager.AbstractTasksModel.IsLauncher) === true) {
@@ -115,16 +183,61 @@ ContainmentItem {
         }
     }
 
-    LauncherWindow {
-        id: launcherWindow
+    ShellOverlay {
+        id: overlay
         catalogue: applications
         systemStatus: systemStatus
+        audio: audio
+        display: displayControl
+        network: network
+        notifications: history
         pinnedIds: root.menuPins
         iconFallback: themeIcon
+        doNotDisturb: root.doNotDisturb
+        anchorRight: taskbar.pillRight
+        onLaunchRequested: desktopId => applications.launchDesktopId(desktopId)
         onLockRequested: root.callSession("org.freedesktop.ScreenSaver", "/ScreenSaver", "org.freedesktop.ScreenSaver", "Lock")
         onLogoutRequested: root.callSession("org.kde.LogoutPrompt", "/LogoutPrompt", "org.kde.LogoutPrompt", "promptLogout")
         onRestartRequested: root.callSession("org.kde.LogoutPrompt", "/LogoutPrompt", "org.kde.LogoutPrompt", "promptReboot")
         onShutdownRequested: root.callSession("org.kde.LogoutPrompt", "/LogoutPrompt", "org.kde.LogoutPrompt", "promptShutDown")
+        onPowerRequested: root.callSession("org.kde.LogoutPrompt", "/LogoutPrompt", "org.kde.LogoutPrompt", "promptAll")
+        onDoNotDisturbToggled: root.setDoNotDisturb(!root.doNotDisturb)
+        onNotificationsSeen: history.lastRead = new Date()
+        onNotificationCloseRequested: row => history.close(history.index(row, 0))
+        onNotificationDefaultActionRequested: row => history.invokeDefaultAction(history.index(row, 0),
+                                                                                   NotificationManager.Notifications.Close)
+        onNotificationActionRequested: (row, actionName) => history.invokeAction(history.index(row, 0), actionName,
+                                                                                  NotificationManager.Notifications.Close)
+        onClearAllRequested: {
+            for (let row = history.count - 1; row >= 0; --row) {
+                history.close(history.index(row, 0));
+            }
+            history.clear(NotificationManager.Notifications.ClearExpired);
+        }
+    }
+
+    ToastWindow {
+        id: toasts
+        model: popups
+        iconFallback: themeIcon
+        onExpireRequested: row => popups.expire(popups.index(row, 0))
+        onCloseRequested: row => popups.close(popups.index(row, 0))
+        onDefaultActionRequested: row => popups.invokeDefaultAction(popups.index(row, 0), NotificationManager.Notifications.Close)
+        onActionRequested: (row, actionName) => popups.invokeAction(popups.index(row, 0), actionName,
+                                                                     NotificationManager.Notifications.Close)
+    }
+
+    // Do not disturb until switched off; apps learn of it through the
+    // notification server.
+    function setDoNotDisturb(on) {
+        if (on) {
+            notificationSettings.notificationsInhibitedUntil = new Date(Date.now() + 10 * 365 * 24 * 3600 * 1000);
+        } else {
+            notificationSettings.notificationsInhibitedUntil = undefined;
+        }
+        notificationSettings.save();
+        NotificationManager.Server.inhibited = on;
+        console.info("STAROS-SHELL dnd=" + on);
     }
 
     function callSession(service, path, iface, member) {
@@ -139,13 +252,15 @@ ContainmentItem {
 
     // Meta and Alt+F1: plasmashell activates the panel containment that
     // provides org.kde.plasma.launchermenu (see metadata.json).
-    Plasmoid.onActivated: launcherWindow.toggleLauncher()
+    Plasmoid.onActivated: overlay.toggle("start")
 
     Component.onCompleted: {
         // Reduced motion in the platform settings turns the animations off.
         Theme.animationFactor = Kirigami.Units.longDuration / 250;
+        NotificationManager.Server.inhibited = root.doNotDisturb;
         console.info("STAROS-SHELL ready shell=org.staros.shell gridUnit=" + Theme.gridUnit
             + " taskbarHeight=" + Theme.taskbarHeight + " focusRing=" + Theme.focusRingWidth
-            + " animationFactor=" + Theme.animationFactor);
+            + " animationFactor=" + Theme.animationFactor
+            + " notificationServer=" + NotificationManager.Server.valid);
     }
 }

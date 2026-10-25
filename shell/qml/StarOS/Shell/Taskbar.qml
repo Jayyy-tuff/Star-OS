@@ -26,15 +26,21 @@ FocusScope {
     property Component iconFallback: null
     // StarOS.System's SystemStatus or a plain object: the tray's description.
     property var systemStatus: null
-    // The tray's symbols, chosen by the host.
+    // The tray's symbols, chosen by the host, and words added to its
+    // description (the network and the volume).
     property string networkSymbol: "wired"
     property string volumeSymbol: "volume"
+    property string trayDetail: ""
     property int unreadNotifications: 0
     property bool doNotDisturb: false
     // Which panel is open, for the buttons' checked state.
     property bool startMenuOpen: false
     property bool quickSettingsOpen: false
     property bool calendarOpen: false
+
+    // The pill's right end in the taskbar's coordinates: the tray's panels
+    // line up with it.
+    readonly property real pillRight: pill.x + pill.width
 
     signal launcherRequested()
     signal activateRequested(int row)
@@ -165,7 +171,7 @@ FocusScope {
                 volumeSymbol: root.volumeSymbol
                 batteryPresent: root.systemStatus ? root.systemStatus.batteryPresent === true : false
                 batteryPercent: Status.value(root.systemStatus, "batteryPercent")
-                description: Status.summary(root.systemStatus)
+                description: [Status.summary(root.systemStatus), root.trayDetail].filter(part => part !== "").join(" ")
                 KeyNavigation.left: apps.count > 0 ? apps : startButton
                 KeyNavigation.right: clockButton
                 onClicked: root.quickSettingsRequested()

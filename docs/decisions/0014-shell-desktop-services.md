@@ -33,6 +33,12 @@ which ADR-0008 rules out.
 - Network: `NetworkStatus` reads systemd-networkd (`org.freedesktop.network1`)
   and iwd (`net.connman.iwd`); Wi-Fi networks are listed and joined through
   iwd with a passphrase agent. The image keeps releng's networkd and iwd.
+  iwd's own D-Bus policy lets only root and the `wheel` group talk to it, so
+  the live medium adds `/etc/dbus-1/system.d/staros-live-iwd.conf`, which lets
+  `liveuser` send to `net.connman.iwd`. The live user already has
+  passwordless sudo (ADR-0008), so this grants nothing new; the Phase 2
+  installer must not copy the file (`check-image-policy.sh` checks it names
+  only `liveuser` and only iwd).
 - Display: brightness through PowerDevil's `org.kde.ScreenBrightness`; night
   light by writing `kwinrc` `[NightColor] Active` and `Mode=Constant` with
   KConfig's notify flag (KWin's config watcher applies it).

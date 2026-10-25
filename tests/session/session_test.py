@@ -32,6 +32,11 @@ Scenarios:
   S18 an app exported into the live user's Flatpak directory while the
       session runs appears in the start menu's "Recently installed" without a
       restart, and starts from a search (ADR-0013)
+  S19 quick settings opens from the tray by keyboard; the network tile says
+      the wired network is connected; Right on the "Volume" slider raises
+      PipeWire's sink volume (QEMU has an HDA sound card for this)
+  S20 a notification sent over D-Bus shows a toast and is listed in the
+      clock's notification centre; "Clear all" empties it (ADR-0014)
   Informational: S11 scaling with kscreen-doctor (AT-SPI geometry and screen
   dumps at 150, 200 and 100 %), S10 Orca (Meta+Alt+S, then a debug Orca's
   speech output for the launcher).
@@ -537,6 +542,10 @@ def run_scenarios(s):
     # leaves a marker, without network.
     scenario_installed_app(s)
 
+    # S19, S20: quick settings and notifications (ADR-0014).
+    scenario_quick_settings(s)
+    scenario_notifications(s)
+
     # Informational until each has three consecutive green runs (design spec).
     for scenario in (scenario_scaling, scenario_orca):
         try:
@@ -643,6 +652,111 @@ def scenario_installed_app(s):
     s.guest(["/usr/bin/rm", "-f", path])
 
 
+AUDIO_ARGS = ("-audiodev", "none,id=snd0", "-device", "intel-hda", "-device", "hda-output,audiodev=snd0")
+
+
+def focus_taskbar_button(s, name, scenario):
+    """Meta+Alt+P, then Right until the taskbar button NAME has the focus."""
+    s.keys("meta_l", "alt", "p")
+    focus = s.wait_focus(BUTTON, "Applications")
+    for _ in range(16):
+        if focus.get("name") == name:
+            break
+        s.keys("right")
+        time.sleep(0.3)
+        focus = s.wait_focus(BUTTON, None, seconds=3)
+    s.check(scenario, focus.get("name") == name, f"the taskbar's {name!r} has the focus: {json.dumps(focus)}")
+    return focus
+
+
+def sink_volume(s):
+    code, out, err = s.as_user(["/usr/bin/wpctl", "get-volume", "@DEFAULT_AUDIO_SINK@"], timeout=30)
+    return code, (out + err).strip()
+
+
+def scenario_quick_settings(s):
+    code, before = sink_volume(s)
+    s.record("S19", "INFO", f"wpctl before: exit {code}, {before!r}")
+    s.as_user(["/usr/bin/wpctl", "set-volume", "@DEFAULT_AUDIO_SINK@", "0.5"], timeout=30)
+    s.as_user(["/usr/bin/wpctl", "set-mute", "@DEFAULT_AUDIO_SINK@", "0"], timeout=30)
+    focus_taskbar_button(s, "Quick settings", "S19")
+    s.keys("ret")
+    tree = wait_tree(s, "plasmashell", lambda t: find(t, role="frame", name="Quick settings", showing=True), 20)
+    frames = find(tree, role="frame", name="Quick settings", showing=True)
+    s.check("S19", bool(frames), f"the 'Quick settings' panel is open: {showing_objects(tree, 60)}")
+    panel = frames[0] if frames else {}
+    network = find(panel, name="Network", showing=True)
+    s.check("S19", bool(network) and network[0].get("description") == "Wired, connected",
+            f"the network tile: {json.dumps(network[:1])}")
+    sliders = find(panel, role="slider", name="Volume", showing=True)
+    s.check("S19", bool(sliders), f"a 'Volume' slider: {json.dumps(sliders[:1])}")
+    for name in ("Night light", "Do not disturb", "Star Lens", "Settings", "Power"):
+        s.record("S19", "INFO", f"{name}: {json.dumps(find(panel, name=name, showing=True)[:1])}")
+    s.screenshot("S19-quick-settings")
+    # Tab to the slider, then Right twice: 50 % becomes 60 %.
+    focus = {}
+    for _ in range(12):
+        s.keys("tab")
+        time.sleep(0.3)
+        focus = s.wait_focus(("slider",), None, seconds=2)
+        if focus.get("role") == "slider" and focus.get("name") == "Volume":
+            break
+    s.check("S19", focus.get("name") == "Volume", f"Tab reaches the Volume slider: {json.dumps(focus)}")
+    s.keys("right")
+    time.sleep(0.5)
+    s.keys("right")
+    time.sleep(1.5)
+    code, after = sink_volume(s)
+    s.check("S19", code == 0 and "0.60" in after, f"PipeWire's sink volume after Right twice: {after!r}")
+    s.keys("esc")
+    time.sleep(1)
+
+
+NOTIFY = ["/usr/bin/gdbus", "call", "--session", "--dest", "org.freedesktop.Notifications",
+          "--object-path", "/org/freedesktop/Notifications", "--method",
+          "org.freedesktop.Notifications.Notify", "Star test", "0", "dialog-information",
+          "Hello from the test", "Sent over D-Bus", "[]", "{}", "30000"]
+
+
+def scenario_notifications(s):
+    code, out, err = s.as_user(["/usr/bin/gdbus", "call", "--session", "--dest", "org.freedesktop.Notifications",
+                                "--object-path", "/org/freedesktop/Notifications", "--method",
+                                "org.freedesktop.Notifications.GetServerInformation"], timeout=30)
+    s.check("S20", code == 0 and "Plasma" in out, f"the notification server: {(out + err).strip()!r}")
+    code, out, err = s.as_user(NOTIFY, timeout=30)
+    s.check("S20", code == 0, f"Notify answered: {(out + err).strip()!r}")
+    toast_name = "Star test: Hello from the test"
+    tree = wait_tree(s, "plasmashell", lambda t: find(t, name=toast_name, showing=True), 20)
+    toasts = find(tree, name=toast_name, showing=True)
+    s.check("S20", bool(toasts), f"a toast shows it: {json.dumps(toasts[:1])}")
+    s.screenshot("S20-toast")
+    focus_taskbar_button(s, "Clock", "S20")
+    s.keys("ret")
+    tree = wait_tree(s, "plasmashell",
+                     lambda t: find(t, role="frame", name="Calendar and notifications", showing=True), 20)
+    frames = find(tree, role="frame", name="Calendar and notifications", showing=True)
+    s.check("S20", bool(frames), f"the calendar and notifications are open: {showing_objects(tree, 60)}")
+    panel = frames[0] if frames else {}
+    listed = find(panel, name=toast_name, showing=True)
+    s.check("S20", bool(listed), "the notification centre lists it")
+    today = [n for n in find(panel, showing=True) if str(n.get("name", "")).endswith(", today")]
+    s.check("S20", bool(today), f"the calendar marks today: {json.dumps(today[:1])}")
+    s.screenshot("S20-calendar")
+    focus = {}
+    for _ in range(12):
+        focus = s.wait_focus(BUTTON, None, seconds=2)
+        if focus.get("name") == "Clear all":
+            break
+        s.keys("tab")
+        time.sleep(0.3)
+    s.check("S20", focus.get("name") == "Clear all", f"Tab reaches 'Clear all': {json.dumps(focus)}")
+    s.keys("ret")
+    tree = wait_tree(s, "plasmashell", lambda t: find(t, name="No new notifications.", showing=True), 15)
+    s.check("S20", bool(find(tree, name="No new notifications.", showing=True)), "Clear all emptied the centre")
+    s.keys("esc")
+    time.sleep(1)
+
+
 # S11: real scaling under KWin with kscreen-doctor (as the live user).
 def scenario_scaling(s):
     code, out, err = s.as_user(["/usr/bin/kscreen-doctor", "-j"], timeout=30)
@@ -701,7 +815,7 @@ def main(argv=None):
     status = 0
     error = None
     try:
-        s.start(os.path.abspath(args.iso))
+        s.start(os.path.abspath(args.iso), extra=AUDIO_ARGS)
         session = s.wait_session_ok()
         problems = boot_test.check_session(session, boot_test.read_forbidden_env())
         s.check("C1", not problems, "session report: " + ("; ".join(problems) or "ok"))

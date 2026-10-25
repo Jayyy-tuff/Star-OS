@@ -348,6 +348,8 @@ Item {
         function test_empty_list_is_never_focused() {
             tasks.clear();
             compare(list.count, 0);
+            // The view applies the change when it lays out.
+            tryVerify(() => !list.visible, 5000, "the empty list is hidden");
             keyClick(Qt.Key_Right);
             expectFocus(tray, "Quick settings");
             keyClick(Qt.Key_Left);

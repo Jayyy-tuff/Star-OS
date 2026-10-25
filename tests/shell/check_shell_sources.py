@@ -7,7 +7,9 @@
 - Every file has an SPDX licence line or a .license sidecar.
 - No file mentions 'org.kde.plasma.private' (private Plasma QML API).
 - StarOS.Shell imports only QtQuick, QtQuick.Templates, QtQuick.Effects and
-  QtQuick.Window, and its qmldir lists exactly the module's QML files.
+  QtQuick.Window, and its qmldir lists exactly the module's QML files; no
+  StarOS.Shell type has the name of a Star OS app's own QML type (the apps
+  import StarOS.Shell, whose type would shadow theirs).
 - SVG artwork is well-formed, starts with a CC-BY-SA-4.0 SPDX comment, keeps
   to what Qt's SVG renderer draws (no filters, masks, clip paths, patterns,
   images, text or CSS), and stays under its size limit; the icons are the seven
@@ -150,6 +152,20 @@ def check_module():
     return problems
 
 
+def check_app_type_names():
+    shell_types = {n[:-4] for n in os.listdir(MODULE) if n.endswith(".qml")}
+    problems = []
+    apps = os.path.join(ROOT, "apps")
+    for app in sorted(os.listdir(apps)):
+        qml_dir = os.path.join(apps, app, "src", "qml")
+        if not os.path.isdir(qml_dir):
+            continue
+        for name in sorted(os.listdir(qml_dir)):
+            if name.endswith(".qml") and name[:-4] in shell_types:
+                problems.append(f"apps/{app}/src/qml/{name} has the name of StarOS.Shell's {name[:-4]}")
+    return problems
+
+
 def svg_tag(element):
     return element.tag.split("}", 1)[-1]
 
@@ -283,6 +299,7 @@ def main():
         ("Plasma package metadata", check_metadata()),
         ("SPDX licence lines", check_licences(files)),
         (f"no {PRIVATE} in shell/", check_private_api(files)),
+        ("StarOS.Shell type names differ from the apps' own", check_app_type_names()),
         ("StarOS.Shell imports and qmldir", check_module()),
         ("Artwork (licence, SVG subset, sizes, wallpaper colours)", check_artwork()),
     ]

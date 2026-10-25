@@ -1,14 +1,14 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # Star OS system QML module (M0.4, M0.5): StarOS.System with the system
-# status, the sticky notes store and the applications model, for the shell and
-# the apps. Built in CI by
+# status, the sticky notes store, the applications model, and sound, display
+# and network for quick settings, for the shell and the apps. Built in CI by
 # scripts/build-packages.sh from a tarball of the checked-out repository
 # (ADR-0009). The version is fixed and bumped in reviewed changes.
 
 pkgname=staros-system
 pkgver=0.5.0
 pkgrel=1
-pkgdesc='Star OS system status, notes and applications QML module'
+pkgdesc='Star OS system status, notes, applications and quick settings QML module'
 arch=(x86_64)
 url='https://github.com/Jayyy-tuff/Star-OS'
 license=(GPL-3.0-or-later)
@@ -17,8 +17,11 @@ options=(!debug !lto)
 depends=(
   gcc-libs
   glibc
+  kconfig
+  kglobalaccel
   kio
   kservice
+  pulseaudio-qt
   qt6-base
   qt6-declarative
 )

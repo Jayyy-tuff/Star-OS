@@ -683,6 +683,7 @@ procps-ng 4.0.7-1
 protobuf 36.1-1
 protobuf-c 1.5.2-15
 psmisc 23.7-2
+pulseaudio-qt 1.7.0-2
 purpose 6.31.0-1
 pv 1.12.0-1
 python 3.14.8-1

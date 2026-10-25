@@ -60,3 +60,42 @@ function summary(status) {
     }
     return [storageLine(status), memoryLine(status), batteryLine(status)].filter(line => line !== "").join(" ");
 }
+
+// The network symbol for the tray and quick settings, from StarOS.System's
+// NetworkStatus (state, kind, wifiAvailable, wifiEnabled) or a plain object.
+function networkSymbol(network) {
+    if (!network) {
+        return "wired";
+    }
+    if (network.kind === "wifi" && network.state !== "offline") {
+        return "wifi";
+    }
+    if (network.kind === "wired" && network.state !== "offline") {
+        return "wired";
+    }
+    return network.wifiAvailable ? "wifi-off" : "wired";
+}
+
+function networkText(network) {
+    if (!network) {
+        return "";
+    }
+    switch (network.state) {
+    case "connected":
+        return network.kind === "wifi" ? (network.networkName || qsTr("Wi-Fi, connected")) : qsTr("Wired, connected");
+    case "limited":
+        return qsTr("Connected, no internet");
+    case "connecting":
+        return qsTr("Connecting…");
+    default:
+        return network.wifiAvailable && !network.wifiEnabled ? qsTr("Wi-Fi is off") : qsTr("Not connected");
+    }
+}
+
+// The volume symbol from AudioControl (available, volume, muted).
+function volumeSymbol(audio) {
+    if (!audio || !audio.available || audio.muted || audio.volume === 0) {
+        return "volume-mute";
+    }
+    return audio.volume < 50 ? "volume-low" : "volume";
+}
