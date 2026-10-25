@@ -187,6 +187,7 @@ Item {
             quick.gameModeAvailable = false;
             quick.gameMode = false;
             quick.clipboardCount = -1;
+            quick.anchorRight = 1100;
             for (const spy of [closeSpy, dndSpy, gameSpy, clipboardSpy, lensSpy, storageSpy, settingsSpy, powerSpy]) {
                 spy.clear();
             }
@@ -251,6 +252,8 @@ Item {
             verify(!game.visible);
             quick.gameModeAvailable = true;
             verify(game.visible);
+            // The grid places a tile that appears when it lays out.
+            waitForRendering(quick);
             mouseClick(game);
             compare(gameSpy.count, 1);
         }
@@ -263,6 +266,7 @@ Item {
             compare(clipboard.Accessible.description, "1 item");
             quick.clipboardCount = 3;
             compare(clipboard.Accessible.description, "3 items");
+            waitForRendering(quick);
             mouseClick(clipboard);
             compare(clipboardSpy.count, 1);
             mouseClick(findChild(quick, "lensTile"));
@@ -374,6 +378,8 @@ Item {
             verify(list.visible);
             compare(list.count, 2);
             compare(list.Accessible.name, "Wi-Fi networks");
+            tryVerify(() => list.itemAtIndex(1) !== null, 2000, "the rows are laid out");
+            waitForRendering(quick);
             const home = list.itemAtIndex(0);
             compare(home.Accessible.name, "Home");
             compare(home.Accessible.description, "Connected, Secured, Signal 4 of 4");
@@ -467,14 +473,20 @@ Item {
             verify(findChild(bare, "doNotDisturbTile").visible);
         }
 
+        // grabImage() returns device pixels without a pixel ratio, cropped to
+        // the item's logical size, so the panel moves to the left where the
+        // sample point stays inside that crop at every scale.
         function test_focus_ring() {
+            quick.anchorRight = Theme.trayPanelWidth + Theme.spacing;
             waitForRendering(quick);
             const img = grabImage(quick);
             const dpr = Screen.devicePixelRatio;
-            const p = networkTile.mapToItem(quick, 1, networkTile.height / 2);
+            const p = networkTile.mapToItem(quick, 0, networkTile.height / 2);
             const y = Math.floor(p.y * dpr);
+            verify(Math.floor((p.x + 6) * dpr) < img.width && y < img.height,
+                   "sample point inside the grabbed image " + img.width + "x" + img.height);
             let hits = 0;
-            for (let x = Math.max(0, Math.floor((p.x - 2) * dpr)); x < Math.floor((p.x + 6) * dpr); ++x) {
+            for (let x = Math.max(0, Math.floor(p.x * dpr) - 2); x < Math.floor((p.x + 6) * dpr); ++x) {
                 if (Math.abs(img.red(x, y) - Theme.focusRing.r * 255) <= 8
                         && Math.abs(img.green(x, y) - Theme.focusRing.g * 255) <= 8
                         && Math.abs(img.blue(x, y) - Theme.focusRing.b * 255) <= 8) {

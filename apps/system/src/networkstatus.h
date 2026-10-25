@@ -2,6 +2,7 @@
 #pragma once
 
 #include <QDBusContext>
+#include <QDBusObjectPath>
 #include <QDBusMessage>
 #include <QObject>
 #include <QQmlEngine>

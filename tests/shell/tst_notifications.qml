@@ -198,6 +198,8 @@ Item {
             }
             verify(open, "a button for the first action");
             verify(open.highlighted);
+            // The row and the card lay out before the click.
+            waitForRendering(card);
             mouseClick(open);
             compare(cardActionSpy.count, 1);
             compare(cardActionSpy.signalArguments[0][0], "open");
@@ -227,7 +229,8 @@ Item {
 
         function test_toast_expires() {
             toastModel.append(notification("Short", {timeout: 300}));
-            compare(toasts.count, 1);
+            // A list view counts its rows when it lays them out.
+            tryCompare(toasts, "count", 1);
             verify(findChild(toastItem(0), "timeLeft").visible, "the time bar shows");
             tryVerify(() => expireSpy.count === 1, 3000, "the toast expires");
             compare(expireSpy.signalArguments[0][0], 0);
