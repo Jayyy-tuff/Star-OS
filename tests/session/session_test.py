@@ -578,11 +578,12 @@ def run_scenarios(s):
     # S24: Game Center (ADR-0017).
     scenario_game_center(s)
 
+    # S26: the Star OS logout screen, asked for every choice (no countdown).
+    # Before S25, so that a lock screen failure does not hide its result.
+    scenario_logout_screen(s)
+
     # S25: the Star OS lock screen (ADR-0016).
     scenario_lock_screen(s)
-
-    # S26: the Star OS logout screen, asked for every choice (no countdown).
-    scenario_logout_screen(s)
 
     # Informational until each has three consecutive green runs (design spec).
     for scenario in (scenario_scaling, scenario_orca):
@@ -907,12 +908,20 @@ def scenario_lock_screen(s):
     with open(os.path.join(s.log_dir, "atspi-lockscreen.json"), "w") as f:
         json.dump(tree, f, indent=1)
     s.record("S25", "INFO", f"lock screen objects: {showing_objects(tree, 40)}")
-    code, out, _ = s.guest(["/usr/bin/sh", "-c", "journalctl -b -o cat --no-pager -q | grep 'STAROS-LOCK' | tail -n 5"])
+    code, out, _ = s.guest(["/usr/bin/sh", "-c", "journalctl -b -o cat --no-pager -q | grep 'STAROS-LOCK'"
+                            " | grep -v guest-exec | tail -n 5"])
     s.record("S25", "INFO", f"lock screen log: {out.strip()!r}")
     # Ours logs 'STAROS-LOCK ready' and names itself 'Screen locked';
     # kscreenlocker's built-in fallback does neither.
-    s.check("S25", "STAROS-LOCK ready" in out or bool(find(tree, name="Screen locked")),
-            "the Star OS lock screen loaded (not the fallback)")
+    loaded = "STAROS-LOCK ready" in out or bool(find(tree, name="Screen locked"))
+    if not loaded:
+        _, log, _ = s.guest(["/usr/bin/sh", "-c", "journalctl -b -o cat --no-pager -q"
+                             " | grep -i -E 'kscreenlocker|lockscreen|greeter|look-and-feel|lookandfeel'"
+                             " | grep -v guest-exec | tail -n 20"])
+        s.record("S25", "INFO", "journal about the lock screen: " + " | ".join(log.strip().splitlines()))
+        # Leave the session usable before failing.
+        s.as_user(["/usr/bin/loginctl", "unlock-session"], timeout=30)
+    s.check("S25", loaded, "the Star OS lock screen loaded (not the fallback)")
     s.check("S25", bool(find(tree, name="Password", showing=True)) and bool(find(tree, name="Unlock", showing=True)),
             "the lock screen shows 'Password' and 'Unlock'")
     s.screenshot("S25-lock-screen")
@@ -934,8 +943,16 @@ def scenario_logout_screen(s):
                      lambda t: find(t, name="What would you like to do?", showing=True), 30)
     with open(os.path.join(s.log_dir, "atspi-logout.json"), "w") as f:
         json.dump(tree, f, indent=1)
-    code, out, _ = s.guest(["/usr/bin/sh", "-c", "journalctl -b -o cat --no-pager -q | grep 'STAROS-LOGOUT' | tail -n 3"])
+    code, out, _ = s.guest(["/usr/bin/sh", "-c", "journalctl -b -o cat --no-pager -q | grep 'STAROS-LOGOUT'"
+                            " | grep -v guest-exec | tail -n 3"])
     s.record("S26", "INFO", f"logout screen log: {out.strip()!r}")
+    if "STAROS-LOGOUT ready" not in out:
+        _, log, _ = s.guest(["/usr/bin/sh", "-c", "journalctl -b -o cat --no-pager -q"
+                             " | grep -i -E 'logout|greeter|look-and-feel|lookandfeel'"
+                             " | grep -v guest-exec | tail -n 20"])
+        s.record("S26", "INFO", "journal about the logout screen: " + " | ".join(log.strip().splitlines()))
+        s.record("S26", "INFO", f"logout screen objects: {showing_objects(tree, 40)}")
+        s.as_user(["/usr/bin/pkill", "-f", "ksmserver-logout-greeter"], timeout=30)
     s.check("S26", "STAROS-LOGOUT ready type=-1" in out, "the Star OS logout screen loaded")
     for name in ("What would you like to do?", "Restart", "Shut down", "Log out", "Cancel"):
         s.check("S26", bool(find(tree, name=name, showing=True)), f"the logout screen shows {name!r}: {showing_objects(tree, 40)}")

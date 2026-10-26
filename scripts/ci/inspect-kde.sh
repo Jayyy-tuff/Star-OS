@@ -389,3 +389,28 @@ if curl -fsSL --retry 3 -o /tmp/kguiaddons.tar.xz "$kga_url"; then
 else
     fact kguiaddons.download FAILED
 fi
+
+section "M0.5: how kscreenlocker and the logout greeter choose the look-and-feel package (source)"
+plasma_version=$(pacman -Si kscreenlocker 2>/dev/null | awk -F': ' '/^Version/{print $2}' | head -n1)
+plasma_upstream=${plasma_version%-*}
+fact plasma.upstream "$plasma_upstream"
+fetch_source() {
+    local name=$1 url="https://download.kde.org/stable/plasma/$plasma_upstream/$1-$plasma_upstream.tar.xz"
+    mkdir -p "/tmp/src/$name"
+    curl -fsSL --retry 3 -o "/tmp/src/$name.tar.xz" "$url" \
+        && tar -xJf "/tmp/src/$name.tar.xz" -C "/tmp/src/$name" --strip-components=1 \
+        || fact "source.$name" "FAILED $url"
+}
+fetch_source kscreenlocker
+fetch_source plasma-workspace
+grep -rn -E 'lockscreenmainscript|LookAndFeel|lookandfeel|LookAndFeelPackage|"Theme"|Theme\b|loadPackage|setPath|falling back' \
+    /tmp/src/kscreenlocker/greeter/*.cpp /tmp/src/kscreenlocker/greeter/*.h /tmp/src/kscreenlocker/*.kcfg \
+    /tmp/src/kscreenlocker/kcfg/*.kcfg /tmp/src/kscreenlocker/settings/*.kcfg 2>/dev/null | head -n 60 | sed 's/^/    | /'
+for f in /tmp/src/kscreenlocker/greeter/greeterapp.cpp; do
+    printf -- '---- %s (package loading)\n' "${f#/tmp/src/}"
+    awk '/lockscreenmainscript|loadPackage|LookAndFeel|Theme/ { for (i = NR - 12; i < NR + 12; i++) want[i] = 1 }
+         { line[NR] = $0 } END { for (i = 1; i <= NR; i++) if (want[i]) printf "    | %d: %s\n", i, line[i] }' "$f"
+done
+grep -rn -E 'logoutmainscript|LookAndFeel|lookandfeel|loadPackage|setPath|fallback' \
+    /tmp/src/plasma-workspace/ksmserver/logout-greeter/ 2>/dev/null | head -n 40 | sed 's/^/    | /'
+grep -rn -E 'lockscreenmainscript|logoutmainscript' /tmp/src/plasma-workspace/ 2>/dev/null | head -n 20 | sed 's/^/    | /'
