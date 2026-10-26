@@ -9,14 +9,16 @@ Run as the live user through runas.py.
       so Qt applications turn on their accessibility bridge.
   atspi_probe.py walk APP [SECONDS]
       Waits up to SECONDS for an application named APP on the AT-SPI desktop
-      and prints its tree as JSON: role, name, description, states and
-      window-relative extents of every object.
+      (or, failing that, one whose program is APP) and prints its tree as
+      JSON: role, name, description, states and window-relative extents of
+      every object.
   atspi_probe.py focused [SECONDS]
       Prints the currently focused object (role and name) as JSON, waiting up
       to SECONDS for one to exist.
 """
 
 import json
+import os
 import sys
 import time
 
@@ -68,11 +70,37 @@ def tree(obj, depth=0, limit=40):
     return node
 
 
-def find_app(name):
+def applications():
     desktop = Atspi.get_desktop(0)
-    for i in range(desktop.get_child_count()):
-        app = desktop.get_child_at_index(i)
-        if app is not None and app.get_name() == name:
+    apps = (desktop.get_child_at_index(i) for i in range(desktop.get_child_count()))
+    return [app for app in apps if app is not None]
+
+
+def program(app):
+    """The program an application runs, for those (such as KDE's greeters)
+    whose AT-SPI name may not be it. The command line and the short name stay
+    readable for processes that refuse ptrace."""
+    try:
+        pid = app.get_process_id()
+        with open(f"/proc/{pid}/cmdline", "rb") as f:
+            argv0 = f.read().split(b"\0")[0].decode(errors="replace")
+        if argv0:
+            return os.path.basename(argv0.split()[0])
+        with open(f"/proc/{pid}/comm") as f:
+            return f.read().strip()
+    except (GLib.Error, OSError, IndexError):
+        return ""
+
+
+def find_app(name):
+    apps = applications()
+    for app in apps:
+        if app.get_name() == name:
+            return app
+    for app in apps:
+        found = program(app)
+        # The kernel's short name keeps 15 characters.
+        if found == name or (len(found) == 15 and name.startswith(found)):
             return app
     return None
 
@@ -85,7 +113,8 @@ def walk(name, seconds):
             print(json.dumps(tree(app)))
             return 0
         if time.monotonic() > deadline:
-            print(json.dumps({"error": f"no application {name!r} on the AT-SPI desktop"}))
+            names = [f"{app.get_name()} ({program(app)})" for app in applications()]
+            print(json.dumps({"error": f"no application {name!r} on the AT-SPI desktop", "applications": names}))
             return 1
         time.sleep(1)
 

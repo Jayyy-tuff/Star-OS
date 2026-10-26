@@ -367,11 +367,14 @@ def run_scenarios(s):
     loaded = s.wait_oracle(lambda e: True, 20, "a first report")
     s.check("S2", True, "KWin oracle reports: " + json.dumps(loaded))
 
+    # The harness enables a11y as Orca would; running Qt apps turn on their
+    # AT-SPI bridge when told.
+    s.atspi("enable")
+
     # S23: the Welcome tour, before anything else wants the focus.
     scenario_welcome(s)
 
-    # S3: the taskbar over AT-SPI (the harness enables a11y as Orca would).
-    s.atspi("enable")
+    # S3: the taskbar over AT-SPI.
     tree = s.atspi("walk", "plasmashell", "45")
     with open(os.path.join(s.log_dir, "atspi-taskbar.json"), "w") as f:
         json.dump(tree, f, indent=1)
@@ -616,7 +619,10 @@ def named_objects(tree, limit=40):
 
 
 def showing_objects(tree, limit=40):
-    """Roles and names of a tree's named objects on screen, for evidence lines."""
+    """Roles and names of a tree's named objects on screen, for evidence lines;
+    the probe's error (with the applications it saw) when there is no tree."""
+    if "error" in tree:
+        return json.dumps(tree)[:600]
     named = [(n.get("role"), n.get("name")) for n in find(tree, showing=True) if n.get("name")]
     return json.dumps(named[:limit])
 
