@@ -399,8 +399,9 @@ What exists in the repository:
 - `apps/games` (`staros-games`, Game Center) and `apps/welcome`
   (`staros-welcome`, Welcome to Star OS); `gamemode`, `wl-clipboard` and
   `inter-font` in the image.
-- `org.staros.lookandfeel` with the Star OS lock screen, the `StarOS` colour
-  scheme and dark icons for KDE apps; manual locking on the live medium.
+- `org.staros.lookandfeel` with the Star OS lock and logout screens, the
+  `StarOS` colour scheme and dark icons for KDE apps; manual locking on the
+  live medium.
 
 ## Supported hardware assumptions (Phase 0)
 
