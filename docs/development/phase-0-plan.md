@@ -11,7 +11,7 @@ security uncertainties, and record human approval of the architecture.
 | Repository initialized | this repo | Done (documentation only) |
 | License and contribution policy | ADR-0007, LICENSES.md, CONTRIBUTING.md | License accepted (GPL-3.0-or-later; docs CC-BY-SA-4.0). Contribution policy: draft |
 | Initial threat model | docs/security/threat-model.md | Draft |
-| Architecture decision records | docs/decisions/ | 0001–0005, 0007–0012 accepted (0011's live polkit rule awaits owner review); 0006 deferred |
+| Architecture decision records | docs/decisions/ | 0001–0005, 0007–0017 accepted (owner review pending: 0011's live polkit rule, 0014's backends, 0015's weather provider); 0006 deferred |
 | Supported hardware assumptions | below | Draft |
 | Package baseline policy | ADR-0002 | Accepted |
 | Wayland/compositor evaluation | ADR-0004 | KWin accepted; shell hosting decided by M0.2 |
@@ -21,6 +21,7 @@ security uncertainties, and record human approval of the architecture.
 | Qt/QML shell prototype | milestone M0.2 | CI green (run 12); owner's VMware run pending |
 | Glass theme, Files, Sun Store | milestone M0.3 | CI green (run 18); owner's VMware run pending |
 | Apps, Star Lens, Star Storage, desktop features | milestone M0.4 | CI green (runs 24 and 25); owner's VMware run and review of the live storage rule pending |
+| Deep Space desktop: taskbar, start menu, installed apps, quick settings, notifications, clipboard, widgets, Game Center, Welcome, lock and logout screens | milestone M0.5 | CI green (run 49); owner's VMware run pending |
 | Moon Browser integration checklist | — | Removed from the current scope at the owner's request (2026-10-19); the owner will add Moon Browser later. No other browser will be substituted without approval |
 
 ## Smallest useful deliverable: M0.1 — console ISO prototype
@@ -369,7 +370,7 @@ Storage (the storage test uses UEFI).
 Still to do: the owner's VMware run (`test-plan.md`, M0.4 procedure) and
 the owner's review of the live polkit rule (ADR-0011).
 
-## M0.5 — Deep Space desktop (in progress)
+## M0.5 — Deep Space desktop (CI green; VMware run pending)
 
 Requested by the owner on 2026-10-25: "make the UI look realistic … modern,
 aesthetic, and admirable", installed apps must appear in Applications, and
@@ -399,9 +400,96 @@ What exists in the repository:
 - `apps/games` (`staros-games`, Game Center) and `apps/welcome`
   (`staros-welcome`, Welcome to Star OS); `gamemode`, `wl-clipboard` and
   `inter-font` in the image.
-- `org.staros.lookandfeel` with the Star OS lock and logout screens, the
-  `StarOS` colour scheme and dark icons for KDE apps; manual locking on the
-  live medium.
+- `org.staros.lookandfeel` with the Star OS logout screen, the `StarOS`
+  colour scheme and dark icons for KDE apps; the Star OS lock screen in the
+  shell package `org.staros.shell` (kscreenlocker 6.7 reads it there);
+  manual locking on the live medium.
+
+### Status (2026-10-26, CI run 49 on commit 7a824ff: every job green)
+
+Measured in CI (QEMU/KVM on GitHub's runners, software rendering with
+llvmpipe; not VMware or hardware results). Runs 32–48 found and fixed, in
+order: the Welcome step read the screen before accessibility was on; the
+toast window waited for a list count that a hidden window never updates;
+the notification centre follows KDE's history settings, which keep
+notifications from unnamed senders out (S20 now sends as Files, which
+names its desktop entry; ADR-0014); the clipboard history read the shell's
+own old copy while another app's copy was arriving (it now reads each
+change again once settled and never lets such a read move a copy up;
+ADR-0014); S21 read the copies in creation order, not screen order;
+kscreenlocker 6.7 loads the lock screen from the shell package, not the
+look-and-feel package (ADR-0016, second amendment); and the session test's
+checks for the greeters. Four runs stopped while downloading from the Arch
+Linux Archive before any test; pacman now retries, and the ISO build fills
+its package cache first. Facts about KDE's behaviour came from
+`scripts/ci/inspect-kde.sh`, which prints the relevant KDE sources and
+runs libnotificationmanager against the taskbar's settings.
+
+- **Packages:** every Star OS package builds in the pinned container and
+  passes its tests, including StarOS.System's clipboard, widget store and
+  game mode tests, Game Center (Steam library files, desktop entries,
+  filters, launches with a recorder, the view) and Welcome (state and
+  pages). The shell's QML tests pass at 100, 150 and 200 %, including the
+  new test that counts toasts in a hidden window.
+- **Image:** the image policy checks pass (the Welcome autostart, GameMode,
+  the lock and logout screens and the colour scheme among them) and the
+  package list matches the baseline.
+- **Boot, idle and Star Storage:** UEFI and BIOS boots reach the session.
+  The three-boot Star Storage test passes, with the Welcome tour skipped on
+  the first boot and staying shut on the third.
+- **Session (QEMU), every scenario S0–S26 passes:**
+  - S23: the Welcome tour opens at login as the active window ("Welcome to
+    Star OS", "Take the tour"); Return turns to "Everything starts with the
+    Star key"; Escape closes it and `staros-welcomerc` records it as seen.
+  - S3–S9, S12–S17: the floating taskbar (Applications, Apps, Quick
+    settings, Clock, Notifications), the start menu, windows by keyboard,
+    Files, Sun Store, quick answers, notes, the system summary and Star Lens,
+    as in M0.4 but through the new shell.
+  - S18: an app exported into the live user's Flatpak folder appears at once
+    under "Recently installed", marked "New. Installed just now · Flatpak",
+    and searching "star test" and Return starts it.
+  - S19: quick settings say "Wired, connected"; Tab reaches "Volume"; Right
+    twice moves PipeWire's sink from 0.50 to 0.60.
+  - S20: a D-Bus notification shows a toast "Files: Hello from the test";
+    the clock's panel lists it and marks "Monday 26 October 2026, today";
+    "Clear all" empties it ("No new notifications.").
+  - S21: a copy survives `wl-copy` exiting; Meta+V lists "Second copy",
+    "Star clipboard test", "36" in that order; Down and Return put "Star
+    clipboard test" back and close the panel.
+  - S22: Clock, Weather, System and Calendar are on the desktop; the weather
+    asks for a city first ("Choose a city"); the System widget shows
+    "Processor: N %"; hiding the calendar in `widgets.json` hides it at once.
+  - S24: Game Center opens from the start menu with "Search games", the
+    filters, "Game mode" and "No games yet".
+  - S26: Power shows the Star OS logout screen ("What would you like to
+    do?", Sleep, Restart, Shut down, Log out, Cancel); Escape cancels it.
+  - S25: locking shows the Star OS lock screen (time, date, "Star OS live
+    user", a focused password field, "Unlock"); Return unlocks the live
+    user.
+  - S11 and S10 (informational): the start menu fits at 100, 150 and 200 %;
+    Orca speaks "Search applications" and "Files".
+- **Idle (T0-25), three boots, all stable.** Median (min–max): session PSS
+  1066.8 MiB (1063.6–1068.1), plasmashell 542.7 MiB, kwin_wayland 194.7 MiB,
+  1347 MiB in use, session CPU 2.05 % of one CPU (1.87–2.30), 32 processes.
+  Against M0.4 (817 MiB, 442 MiB, 0.18 %) memory grew by about 250 MiB and
+  idle CPU about elevenfold. Not measured yet, but likely: the System
+  widget's figures change every 5 seconds and repaint the full-screen glass
+  desktop with software rendering. Not a performance claim.
+
+Known gaps: the lock screen's password field reports "Password" as its
+accessible description rather than its name (Orca may still read it; to be
+checked); notifications from senders that name no app are not listed in
+the notification centre (KDE's default setting, ADR-0014).
+
+Not tested in CI: Wi-Fi, brightness and battery (no such hardware), the
+weather with network, Steam and real games, GameMode's effect, sound
+output, and anything in VMware or on hardware.
+
+Still to do: the owner's VMware run (`test-plan.md`, M0.5 procedure); the
+owner's review of ADR-0014's backends (iwd for Wi-Fi, PowerDevil for
+brightness, a networkd summary) and ADR-0015's weather provider
+(Open-Meteo); the idle CPU follow-up above; and the earlier owner items
+(M0.2–M0.4 VMware runs, ADR-0011's live polkit rule).
 
 ## Supported hardware assumptions (Phase 0)
 
