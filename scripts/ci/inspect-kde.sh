@@ -177,3 +177,139 @@ printf -- '---- greeter strings about authentication\n'
 strings -n 5 /usr/lib/kscreenlocker_greet 2>/dev/null \
     | grep -E -i '^(startAuthenticating|respond|tryUnlock|cancel|hadPrompt|promptForSecret|prompt|infoMessage|errorMessage|succeeded|failed|unlocked|busy|graceLocked)' \
     | sort -u | sed 's/^/    /'
+
+section "M0.5: libnotificationmanager with the Star OS taskbar's models (S20 reproduction)"
+for h in notifications.h server.h settings.h notification.h; do
+    f=/usr/include/notificationmanager/$h
+    printf -- '---- %s\n' "$f"
+    grep -n -E 'Q_PROPERTY|Q_ENUM|Q_FLAG|Q_INVOKABLE|enum |= 1 <<|Urgency|inhibit|Inhibit|window|init\(' "$f" 2>/dev/null \
+        | head -n 120 | sed 's/^/    | /' || echo "    (missing)"
+done
+qml_tool=$(command -v qml6 || command -v /usr/lib/qt6/bin/qml || true)
+fact notify.qml_tool "$qml_tool"
+cat >/tmp/notify-probe.qml <<'EOF'
+import QtQuick
+import org.kde.notificationmanager as NotificationManager
+
+// The taskbar's popups and history models (main.qml), and variants with
+// one filter left out, to see which keeps a notification away.
+Item {
+    id: root
+
+    NotificationManager.Settings {
+        id: notificationSettings
+    }
+
+    readonly property bool doNotDisturb: notificationSettings.notificationsInhibitedUntil > new Date()
+
+    NotificationManager.Notifications {
+        id: popups
+        limit: 3
+        showExpired: false
+        showDismissed: false
+        showJobs: false
+        blacklistedDesktopEntries: notificationSettings.popupBlacklistedApplications
+        blacklistedNotifyRcNames: notificationSettings.popupBlacklistedServices
+        urgencies: root.doNotDisturb ? NotificationManager.Notifications.CriticalUrgency
+            : NotificationManager.Notifications.NormalUrgency | NotificationManager.Notifications.CriticalUrgency
+        sortMode: NotificationManager.Notifications.SortByDate
+        sortOrder: Qt.DescendingOrder
+        groupMode: NotificationManager.Notifications.GroupDisabled
+        onCountChanged: console.info("PROBE popups.countChanged " + count)
+    }
+    NotificationManager.Notifications {
+        id: history
+        showExpired: true
+        showDismissed: true
+        showJobs: false
+        blacklistedDesktopEntries: notificationSettings.historyBlacklistedApplications
+        blacklistedNotifyRcNames: notificationSettings.historyBlacklistedServices
+        sortMode: NotificationManager.Notifications.SortByDate
+        sortOrder: Qt.DescendingOrder
+        groupMode: NotificationManager.Notifications.GroupDisabled
+        onCountChanged: console.info("PROBE history.countChanged " + count)
+    }
+    NotificationManager.Notifications {
+        id: plain
+        onCountChanged: console.info("PROBE plain.countChanged " + count)
+    }
+    NotificationManager.Notifications {
+        id: noUrgencies
+        limit: 3
+        showExpired: false
+        showDismissed: false
+        showJobs: false
+        sortMode: NotificationManager.Notifications.SortByDate
+        groupMode: NotificationManager.Notifications.GroupDisabled
+    }
+    NotificationManager.Notifications {
+        id: noLimit
+        showExpired: false
+        showDismissed: false
+        showJobs: false
+        urgencies: NotificationManager.Notifications.NormalUrgency | NotificationManager.Notifications.CriticalUrgency
+    }
+    ListView {
+        id: view
+        width: 100
+        height: 300
+        model: popups
+        delegate: Item {
+            required property var model
+            width: 10
+            height: 10
+            Component.onCompleted: console.info("PROBE delegate summary=" + model.summary + " urgency=" + model.urgency
+                + " timeout=" + model.timeout + " expired=" + model.expired + " app=" + model.applicationName
+                + " desktopEntry=" + model.desktopEntry)
+        }
+    }
+
+    function state() {
+        return "popups=" + popups.count + "/" + popups.rowCount() + " history=" + history.count + "/" + history.rowCount()
+            + " plain=" + plain.count + "/" + plain.rowCount() + " noUrgencies=" + noUrgencies.rowCount()
+            + " noLimit=" + noLimit.rowCount() + " view=" + view.count + " valid=" + NotificationManager.Server.valid
+            + " inhibited=" + NotificationManager.Server.inhibited + " dnd=" + root.doNotDisturb
+            + " until=" + notificationSettings.notificationsInhibitedUntil + " urgencies=" + popups.urgencies
+            + " enums=" + NotificationManager.Notifications.LowUrgency + "," + NotificationManager.Notifications.NormalUrgency
+            + "," + NotificationManager.Notifications.CriticalUrgency;
+    }
+
+    Timer {
+        interval: 1000
+        repeat: true
+        running: true
+        onTriggered: console.info("PROBE tick " + root.state())
+    }
+
+    Component.onCompleted: {
+        NotificationManager.Server.inhibited = root.doNotDisturb;
+        console.info("PROBE ready " + root.state());
+    }
+}
+EOF
+cat >/tmp/notify-probe.sh <<'EOF'
+#!/bin/bash
+export QT_QPA_PLATFORM=offscreen QT_FORCE_STDERR_LOGGING=1
+export QT_LOGGING_RULES="org.kde.plasma.notifications*=true;org.kde.notificationmanager*=true"
+"$1" /tmp/notify-probe.qml >/tmp/notify-probe.log 2>&1 &
+pid=$!
+sleep 5
+call() { gdbus call --session --dest org.freedesktop.Notifications --object-path /org/freedesktop/Notifications \
+    --method "org.freedesktop.Notifications.$1" "${@:2}" 2>&1; }
+echo "PROBE-SH server: $(call GetServerInformation)"
+echo "PROBE-SH plain: $(call Notify 'Star test' 0 dialog-information 'Hello from the test' 'Sent over D-Bus' '[]' '{}' 30000)"
+sleep 3
+echo "PROBE-SH urgency: $(call Notify 'Star test' 0 dialog-information 'With urgency' 'Normal urgency' '[]' "{'urgency': <byte 1>}" 30000)"
+sleep 3
+echo "PROBE-SH desktop-entry: $(call Notify 'Konsole' 0 utilities-terminal 'With a desktop entry' 'Konsole' '[]' "{'desktop-entry': <'org.kde.konsole'>}" 30000)"
+sleep 4
+kill "$pid"
+wait "$pid" 2>/dev/null
+grep -v -E 'QStandardPaths|propagateSizeHints' /tmp/notify-probe.log | head -n 120
+EOF
+chmod 0755 /tmp/notify-probe.sh
+if [[ -n $qml_tool ]]; then
+    timeout 120 runuser -u probe -- env XDG_RUNTIME_DIR="$runtime" HOME=/home/probe \
+        dbus-run-session /tmp/notify-probe.sh "$qml_tool" 2>&1 | sed 's/^/    /'
+    fact notify.probe_exit "${PIPESTATUS[0]}"
+fi

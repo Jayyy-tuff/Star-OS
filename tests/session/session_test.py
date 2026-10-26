@@ -768,6 +768,11 @@ def scenario_notifications(s):
     toast_name = "Star test: Hello from the test"
     tree = wait_tree(s, "plasmashell", lambda t: find(t, name=toast_name, showing=True), 20)
     toasts = find(tree, name=toast_name, showing=True)
+    if not toasts:
+        code, out, _ = s.guest(["/usr/bin/sh", "-c", "journalctl -b _UID=1000 -o cat --no-pager -q"
+                                " | grep -i -E 'notif|toast' | tail -n 15"])
+        s.record("S20", "INFO", f"journal about notifications: {out.strip()!r}")
+        s.record("S20", "INFO", f"plasmashell objects: {showing_objects(tree, 30)}")
     s.check("S20", bool(toasts), f"a toast shows it: {json.dumps(toasts[:1])}")
     s.screenshot("S20-toast")
     focus_taskbar_button(s, "Clock", "S20")
