@@ -164,3 +164,16 @@ grep -rhoE '\b(authenticator|kscreenlocker_[A-Za-z]+|sessionsModel|keystateSourc
     | sort | uniq -c | sed 's/^/    /'
 printf -- '---- kscreenlocker greeter strings\n'
 strings /usr/lib/kscreenlocker_greet 2>/dev/null | grep -E '^(authenticator|kscreenlocker_|org\.kde\.|lockscreen|LockScreen)' | sort -u | head -n 60 | sed 's/^/    /'
+
+section "M0.5: where kscreenlocker keeps its own lock screen, and the authenticator's API"
+pacman -Qlq kscreenlocker 2>/dev/null | grep -v -E '/locale/|/doc/|/$' | sed 's/^/    /'
+mapfile -t lock_qml < <(grep -rl --include='*.qml' -e 'authenticator' /usr/share /usr/lib/qt6/qml 2>/dev/null | head -n 20)
+fact lockscreen.qml "${lock_qml[*]}"
+for f in "${lock_qml[@]}"; do
+    printf -- '---- %s\n' "$f"
+    grep -n -E 'authenticator|Qt\.quit|kscreenlocker_|signal |property ' "$f" | head -n 80 | sed 's/^/    | /'
+done
+printf -- '---- greeter strings about authentication\n'
+strings -n 5 /usr/lib/kscreenlocker_greet 2>/dev/null \
+    | grep -E -i '^(startAuthenticating|respond|tryUnlock|cancel|hadPrompt|promptForSecret|prompt|infoMessage|errorMessage|succeeded|failed|unlocked|busy|graceLocked)' \
+    | sort -u | sed 's/^/    /'

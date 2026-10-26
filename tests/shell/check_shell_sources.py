@@ -115,7 +115,8 @@ def check_metadata():
                 if not os.path.isfile(main):
                     problems.append(f"{rel(main)} is missing")
             elif kind == "look-and-feel":
-                for needed in ("defaults", os.path.join("lockscreen", "LockScreen.qml")):
+                for needed in ("defaults", os.path.join("lockscreen", "LockScreen.qml"),
+                               os.path.join("logout", "Logout.qml")):
                     if not os.path.isfile(os.path.join(base, name, "contents", needed)):
                         problems.append(f"{rel(path)}: contents/{needed} is missing")
             else:

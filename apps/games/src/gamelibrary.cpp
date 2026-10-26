@@ -389,7 +389,6 @@ bool GameLibrary::defaultLaunch(const QString &kind, const QString &target, bool
         }
         auto *job = new KIO::CommandLauncherJob(QStringLiteral("gamemoderun"), args);
         job->setDesktopName(service->desktopEntryName());
-        job->setIcon(service->icon());
         connect(job, &KJob::result, this, [this, job, name = service->name()] {
             if (job->error() != 0) {
                 Q_EMIT launchFailed(name);

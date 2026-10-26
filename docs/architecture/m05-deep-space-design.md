@@ -169,9 +169,10 @@ run.
   user's picture or initial and name, a "Password" field and "Unlock"; Return
   with an empty field unlocks the passwordless live user through PAM's
   `nullok`. `kdeglobals` names the package. On the live medium the screen
-  never locks by itself (`Autolock=false`), but Lock and Meta+L work. The
-  logout screen stays Breeze's until its API is confirmed (ADR-0016
-  amendment).
+  never locks by itself (`Autolock=false`), but Lock and Meta+L work.
+- `logout/Logout.qml`: the same glass and wallpaper with Restart, Shut down,
+  Log out (and Sleep where offered) and Cancel; one asked-for action counts
+  down 30 seconds as in Breeze.
 - `StarOS` colour scheme (`/usr/share/color-schemes/StarOS.colors`, its
   groups also in `/etc/xdg/kdeglobals`) is the default for KDE apps and
   window title bars, with `breeze-dark` icons; the accent matches the shell.

@@ -45,6 +45,8 @@ Scenarios:
   S25 locking shows the Star OS lock screen (kscreenlocker with
       org.staros.lookandfeel): the time, a "Password" field and "Unlock";
       Return unlocks the passwordless live user (ADR-0016)
+  S26 Power shows the Star OS logout screen ("What would you like to do?",
+      Restart, Shut down, Log out, Cancel); Escape cancels it (ADR-0016)
   S21 a copy survives the app that made it (wl-copy exits, wl-paste still
       reads it); Meta+V lists the copies newest first and Return puts the
       chosen one back on the clipboard (ADR-0014)
@@ -575,6 +577,9 @@ def run_scenarios(s):
     # S25: the Star OS lock screen (ADR-0016).
     scenario_lock_screen(s)
 
+    # S26: the Star OS logout screen, asked for every choice (no countdown).
+    scenario_logout_screen(s)
+
     # Informational until each has three consecutive green runs (design spec).
     for scenario in (scenario_scaling, scenario_orca):
         try:
@@ -892,6 +897,33 @@ def scenario_lock_screen(s):
         s.as_user(["/usr/bin/loginctl", "unlock-session"], timeout=30)
     s.check("S25", unlocked, "Return unlocked the live user")
     s.screenshot("S25-unlocked")
+
+
+def scenario_logout_screen(s):
+    code, out, err = s.as_user(["/usr/bin/gdbus", "call", "--session", "--dest", "org.kde.LogoutPrompt",
+                                "--object-path", "/LogoutPrompt", "--method", "org.kde.LogoutPrompt.promptAll"],
+                               timeout=30)
+    s.check("S26", code == 0, f"promptAll answered: {(out + err).strip()!r}")
+    tree = wait_tree(s, "ksmserver-logout-greeter",
+                     lambda t: find(t, name="What would you like to do?", showing=True), 30)
+    with open(os.path.join(s.log_dir, "atspi-logout.json"), "w") as f:
+        json.dump(tree, f, indent=1)
+    code, out, _ = s.guest(["/usr/bin/sh", "-c", "journalctl -b -o cat --no-pager -q | grep 'STAROS-LOGOUT' | tail -n 3"])
+    s.record("S26", "INFO", f"logout screen log: {out.strip()!r}")
+    s.check("S26", "STAROS-LOGOUT ready type=-1" in out, "the Star OS logout screen loaded")
+    for name in ("What would you like to do?", "Restart", "Shut down", "Log out", "Cancel"):
+        s.check("S26", bool(find(tree, name=name, showing=True)), f"the logout screen shows {name!r}: {showing_objects(tree, 40)}")
+    s.screenshot("S26-logout")
+    s.keys("esc")
+    closed = False
+    deadline = time.monotonic() + 15
+    while time.monotonic() < deadline and not closed:
+        code, _, _ = s.guest(["/usr/bin/pgrep", "-u", "liveuser", "-f", "ksmserver-logout-greeter"])
+        closed = code != 0
+        time.sleep(1)
+    if not closed:
+        s.as_user(["/usr/bin/pkill", "-f", "ksmserver-logout-greeter"], timeout=30)
+    s.check("S26", closed, "Escape cancelled the logout screen")
 
 
 def paste(s):

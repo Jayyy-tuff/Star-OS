@@ -48,9 +48,16 @@ Light colours, and the UI font is Noto Sans.
   one, and logs what it found (`STAROS-LOCK ready … api=`). Without a
   password PAM can accept before anything is typed; as in Breeze, the screen
   then waits for Return.
-- `logout/Logout.qml` is not shipped yet: the logout greeter's QML API is
-  being confirmed from the pinned Plasma packages (`inspect-kde.sh`), and the
-  package falls back to Breeze's logout screen until then.
+- Plasma 6.7's Breeze package has no `lockscreen/` folder any more
+  (kscreenlocker carries its own); kscreenlocker still loads the look's
+  `lockscreen/LockScreen.qml` (its `lockscreenmainscript`). `inspect-kde.sh`
+  prints where kscreenlocker's own lock screen lives and the authenticator
+  names it uses.
+- `logout/Logout.qml` follows Breeze's Plasma 6.7 logout screen (the same
+  signals; `sdtype`, `maysd`, `canLogout`, `spdMethods` read defensively,
+  without Breeze's private `org.kde.plasma.private.sessions` import). Asked
+  for one action, it counts down 30 seconds as Breeze does; Power shows every
+  choice without a countdown.
 
 ## Consequences and trade-offs
 
