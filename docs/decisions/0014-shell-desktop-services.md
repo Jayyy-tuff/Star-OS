@@ -26,7 +26,13 @@ which ADR-0008 rules out.
 
 - Notifications: creating libnotificationmanager's `Notifications` model in
   the taskbar adapter registers `org.freedesktop.Notifications`; Star OS
-  draws toasts and the notification centre.
+  draws toasts and the notification centre. Both follow KDE's notification
+  settings (System Settings → Notifications), so their per-app choices
+  apply. In a new Plasma 6.7 profile those settings keep notifications from
+  senders that name no app ("Other applications"), and from drkonqi, VLC
+  and Klipper, out of the history: such notifications pop up as toasts but
+  are not listed in the notification centre (checked with
+  `scripts/ci/inspect-kde.sh`, 2026-10-26).
 - Audio: add the `pulseaudio-qt` package (LGPL-2.1, KDE); `AudioControl`
   controls the default sink of PipeWire's Pulse server and registers volume
   keys with KGlobalAccel.

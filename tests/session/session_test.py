@@ -35,8 +35,9 @@ Scenarios:
   S19 quick settings opens from the tray by keyboard; the network tile says
       the wired network is connected; Right on the "Volume" slider raises
       PipeWire's sink volume (QEMU has an HDA sound card for this)
-  S20 a notification sent over D-Bus shows a toast and is listed in the
-      clock's notification centre; "Clear all" empties it (ADR-0014)
+  S20 a notification sent over D-Bus as Files (naming its desktop entry)
+      shows a toast and is listed in the clock's notification centre;
+      "Clear all" empties it (ADR-0014)
   S23 (right after S2) the Welcome tour opened at login: its first page,
       Return turns the page, Escape skips it, and it is marked as seen in
       ~/.config/staros-welcomerc (ADR-0017)
@@ -752,10 +753,20 @@ def scenario_quick_settings(s):
     time.sleep(1)
 
 
+# As an installed app sends it, naming its desktop entry: Plasma's default
+# settings keep notifications from unnamed senders ("Other applications")
+# out of the history, and the notification centre follows those settings.
 NOTIFY = ["/usr/bin/gdbus", "call", "--session", "--dest", "org.freedesktop.Notifications",
           "--object-path", "/org/freedesktop/Notifications", "--method",
-          "org.freedesktop.Notifications.Notify", "Star test", "0", "dialog-information",
-          "Hello from the test", "Sent over D-Bus", "[]", "{}", "30000"]
+          "org.freedesktop.Notifications.Notify", "Files", "0", "org.staros.files",
+          "Hello from the test", "Sent over D-Bus", "[]", "{'desktop-entry': <'org.staros.files'>}", "30000"]
+NOTIFY_SUMMARY = "Hello from the test"
+
+
+def notification_named(tree):
+    """Showing objects named '<app>: Hello from the test' (the app name is
+    the desktop entry's)."""
+    return [n for n in find(tree, showing=True) if str(n.get("name", "")).endswith(": " + NOTIFY_SUMMARY)]
 
 
 def scenario_notifications(s):
@@ -765,15 +776,16 @@ def scenario_notifications(s):
     s.check("S20", code == 0 and "Plasma" in out, f"the notification server: {(out + err).strip()!r}")
     code, out, err = s.as_user(NOTIFY, timeout=30)
     s.check("S20", code == 0, f"Notify answered: {(out + err).strip()!r}")
-    toast_name = "Star test: Hello from the test"
-    tree = wait_tree(s, "plasmashell", lambda t: find(t, name=toast_name, showing=True), 20)
-    toasts = find(tree, name=toast_name, showing=True)
+    tree = wait_tree(s, "plasmashell", notification_named, 20)
+    toasts = notification_named(tree)
     if not toasts:
         code, out, _ = s.guest(["/usr/bin/sh", "-c", "journalctl -b _UID=1000 -o cat --no-pager -q"
                                 " | grep -i -E 'notif|toast' | tail -n 15"])
         s.record("S20", "INFO", f"journal about notifications: {out.strip()!r}")
         s.record("S20", "INFO", f"plasmashell objects: {showing_objects(tree, 30)}")
     s.check("S20", bool(toasts), f"a toast shows it: {json.dumps(toasts[:1])}")
+    s.check("S20", toasts[0].get("name") == "Files: " + NOTIFY_SUMMARY,
+            f"the toast names the app from its desktop entry: {toasts[0].get('name')!r}")
     s.screenshot("S20-toast")
     focus_taskbar_button(s, "Clock", "S20")
     s.keys("ret")
@@ -782,8 +794,8 @@ def scenario_notifications(s):
     frames = find(tree, role="frame", name="Calendar and notifications", showing=True)
     s.check("S20", bool(frames), f"the calendar and notifications are open: {showing_objects(tree, 60)}")
     panel = frames[0] if frames else {}
-    listed = find(panel, name=toast_name, showing=True)
-    s.check("S20", bool(listed), "the notification centre lists it")
+    listed = notification_named(panel)
+    s.check("S20", bool(listed), f"the notification centre lists it: {json.dumps(listed[:1])}")
     today = [n for n in find(panel, showing=True) if str(n.get("name", "")).endswith(", today")]
     s.check("S20", bool(today), f"the calendar marks today: {json.dumps(today[:1])}")
     s.screenshot("S20-calendar")
