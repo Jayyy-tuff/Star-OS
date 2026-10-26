@@ -31,12 +31,12 @@ ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 SHELL = os.path.join(ROOT, "shell")
 MODULE = os.path.join(SHELL, "qml", "StarOS", "Shell")
 MODULE_IMPORTS = {"QtQuick", "QtQuick.Templates", "QtQuick.Effects", "QtQuick.Window"}
-PACKAGE_KINDS = {"shells": "Plasma/Shell", "plasmoids": "Plasma/Applet"}
+PACKAGE_KINDS = {"shells": "Plasma/Shell", "plasmoids": "Plasma/Applet", "look-and-feel": "Plasma/LookAndFeel"}
 SPDX = "SPDX-License-Identifier:"
 PRIVATE = "org.kde.plasma.private"
 ARTWORK_SPDX = re.compile(r"\A\s*<!--\s*SPDX-License-Identifier:\s*CC-BY-SA-4\.0\s*-->")
 ICONS = {"terminal.svg", "settings.svg", "files.svg", "sun-store.svg", "moon-browser.svg",
-         "lens.svg", "storage.svg"}
+         "lens.svg", "storage.svg", "games.svg", "welcome.svg"}
 ICON_LIMIT = 8 * 1024
 WALLPAPER = os.path.join(MODULE, "wallpaper", "star-os-glass.svg")
 WALLPAPER_LIMIT = 64 * 1024
@@ -114,13 +114,17 @@ def check_metadata():
                 main = os.path.join(base, name, "contents", "ui", "main.qml")
                 if not os.path.isfile(main):
                     problems.append(f"{rel(main)} is missing")
+            elif kind == "look-and-feel":
+                for needed in ("defaults", os.path.join("lockscreen", "LockScreen.qml")):
+                    if not os.path.isfile(os.path.join(base, name, "contents", needed)):
+                        problems.append(f"{rel(path)}: contents/{needed} is missing")
             else:
                 for needed in ("defaults", "layout.js", os.path.join("views", "Panel.qml"),
                                os.path.join("views", "Desktop.qml")):
                     if not os.path.isfile(os.path.join(base, name, "contents", needed)):
                         problems.append(f"{rel(path)}: contents/{needed} is missing")
-    if found != 3:
-        problems.append(f"expected 3 Plasma packages, found {found}")
+    if found != 4:
+        problems.append(f"expected 4 Plasma packages, found {found}")
     return problems
 
 

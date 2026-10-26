@@ -51,3 +51,10 @@ tesseract-data-eng
 # M0.5 (docs/architecture/m05-deep-space-design.md, ADR-0016): Inter as the
 # system UI font.
 inter-font
+# M0.5 (ADR-0014): wl-copy and wl-paste, the command-line clipboard; the
+# session test uses them to check the clipboard history.
+wl-clipboard
+# Game Center with GameMode, and the Welcome tour (ADR-0017).
+staros-games
+gamemode
+staros-welcome

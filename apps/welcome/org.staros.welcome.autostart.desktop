@@ -1,0 +1,11 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Installed as /etc/xdg/autostart/org.staros.welcome.desktop: the tour opens at
+# login until the person finishes or skips it (~/.config/staros-welcomerc).
+[Desktop Entry]
+Type=Application
+Name=Welcome to Star OS
+Exec=staros-welcome --autostart
+Icon=help-about
+Terminal=false
+NoDisplay=true
+X-KDE-autostart-phase=2

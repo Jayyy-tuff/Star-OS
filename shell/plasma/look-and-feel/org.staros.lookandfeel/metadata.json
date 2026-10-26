@@ -1,0 +1,17 @@
+{
+    "KPackageStructure": "Plasma/LookAndFeel",
+    "KPlugin": {
+        "Authors": [
+            {
+                "Name": "Star OS project"
+            }
+        ],
+        "Description": "Star OS deep space look: colours, icons and the lock screen",
+        "Id": "org.staros.lookandfeel",
+        "License": "GPL-3.0-or-later",
+        "Name": "Star OS",
+        "Version": "0.5",
+        "Website": "https://github.com/Jayyy-tuff/Star-OS"
+    },
+    "X-Plasma-APIVersion": "2"
+}

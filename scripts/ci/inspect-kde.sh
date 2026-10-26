@@ -142,3 +142,25 @@ fact kwin.smoke_exit "$status"
 fact kwin.session_ran "$(grep -c KWIN-SESSION-RAN /tmp/kwin.log)"
 grep -i -E 'composit|render|opengl|qpainter|egl|error|fail' /tmp/kwin.log | head -n 25 | sed 's/^/    /'
 tail -n 15 /tmp/kwin.log | sed 's/^/    tail: /'
+
+section "M0.5: package versions for the baseline"
+for p in pulseaudio-qt inter-font wl-clipboard gamemode lib32-gamemode kguiaddons kscreenlocker plasma-workspace; do
+    fact "pkg.$p" "$(pacman -Si "$p" 2>/dev/null | awk -F': ' '/^Version/{print $2}' | head -n1)"
+done
+pacman -S --noconfirm --needed kscreenlocker plasma-workspace gamemode wl-clipboard >/tmp/install-m05.log 2>&1
+fact install_m05.exit "$?"
+fact gamemode.files "$(pacman -Qlq gamemode 2>/dev/null | grep -E 'bin/|polkit|\.service' | tr '\n' ' ')"
+
+section "M0.5: Breeze look-and-feel lock screen and logout (the kscreenlocker and logout greeter API)"
+lnf=/usr/share/plasma/look-and-feel/org.kde.breeze.desktop/contents
+fact lnf.files "$(find "$lnf" -maxdepth 2 \( -path '*/lockscreen/*' -o -path '*/logout/*' -o -name defaults \) | sort | tr '\n' ' ')"
+for f in "$lnf/defaults" "$lnf/../metadata.json" "$lnf/lockscreen/LockScreen.qml" "$lnf/lockscreen/LockScreenUi.qml" \
+    "$lnf/lockscreen/MainBlock.qml" "$lnf/logout/Logout.qml"; do
+    printf -- '---- %s\n' "$f"
+    sed 's/^/    | /' "$f" 2>/dev/null || echo "    (missing)"
+done
+printf -- '---- context properties and signals the lock screen QML uses\n'
+grep -rhoE '\b(authenticator|kscreenlocker_[A-Za-z]+|sessionsModel|keystateSource|wallpaper|config)\.[A-Za-z]+' "$lnf/lockscreen" 2>/dev/null \
+    | sort | uniq -c | sed 's/^/    /'
+printf -- '---- kscreenlocker greeter strings\n'
+strings /usr/lib/kscreenlocker_greet 2>/dev/null | grep -E '^(authenticator|kscreenlocker_|org\.kde\.|lockscreen|LockScreen)' | sort -u | head -n 60 | sed 's/^/    /'

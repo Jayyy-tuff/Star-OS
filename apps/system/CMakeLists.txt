@@ -24,7 +24,7 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 find_package(Qt6 ${QT_MIN_VERSION} REQUIRED COMPONENTS Core DBus Gui Qml)
-find_package(KF6 ${KF_MIN_VERSION} REQUIRED COMPONENTS Config GlobalAccel KIO Service)
+find_package(KF6 ${KF_MIN_VERSION} REQUIRED COMPONENTS Config GlobalAccel GuiAddons KIO Service)
 find_package(KF6PulseAudioQt REQUIRED)
 
 qt_policy(SET QTP0001 NEW)

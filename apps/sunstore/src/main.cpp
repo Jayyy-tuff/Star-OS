@@ -20,9 +20,17 @@ int main(int argc, char *argv[])
     parser.setApplicationDescription(QCoreApplication::translate("main", "Star OS app store for Flatpak apps from Flathub"));
     parser.addHelpOption();
     parser.addVersionOption();
+    // Game Center's "Get games" opens the Games category (ADR-0017).
+    const QCommandLineOption categoryOption(QStringLiteral("category"),
+                                            QCoreApplication::translate("main", "Open on a category, such as Game."),
+                                            QStringLiteral("category"));
+    parser.addOption(categoryOption);
     parser.process(app);
 
     QQmlApplicationEngine engine;
+    if (parser.isSet(categoryOption)) {
+        engine.setInitialProperties({{QStringLiteral("initialCategory"), parser.value(categoryOption)}});
+    }
     QObject::connect(
         &engine,
         &QQmlApplicationEngine::objectCreationFailed,

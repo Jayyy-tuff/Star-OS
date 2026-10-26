@@ -1,0 +1,12 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+[Desktop Entry]
+Type=Application
+Name=Game Center
+GenericName=Game Library
+Comment=Your games from Steam, Flathub and your apps in one place
+Exec=staros-games
+Icon=applications-games
+Terminal=false
+Categories=Qt;Game;
+Keywords=games;steam;play;gamemode;emulator;
+StartupNotify=true

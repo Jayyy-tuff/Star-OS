@@ -1,0 +1,12 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+[Desktop Entry]
+Type=Application
+Name=Welcome to Star OS
+GenericName=Tour
+Comment=A short tour of the start menu, Star Lens, Star Storage, Sun Store and Game Center
+Exec=staros-welcome
+Icon=help-about
+Terminal=false
+Categories=Qt;Utility;
+Keywords=welcome;tour;help;start;
+StartupNotify=true

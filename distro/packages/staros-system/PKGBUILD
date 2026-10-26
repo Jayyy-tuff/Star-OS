@@ -19,6 +19,7 @@ depends=(
   glibc
   kconfig
   kglobalaccel
+  kguiaddons
   kio
   kservice
   pulseaudio-qt

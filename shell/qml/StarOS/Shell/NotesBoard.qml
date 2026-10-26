@@ -18,6 +18,8 @@ Item {
     property size screenSize: Qt.size(board.width, board.height)
 
     readonly property int count: notesRepeater.count
+    // The width of the button row at the top right, for neighbours.
+    readonly property real toolbarWidth: newNoteButton.width
 
     Accessible.role: Accessible.Pane
     Accessible.name: qsTr("Sticky notes")

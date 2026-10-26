@@ -25,6 +25,7 @@ private Q_SLOTS:
     void diskWithoutCowDeviceIsLive();
     void installedSystem();
     void memory();
+    void processor();
     void batteries();
     void noBattery();
     void interval();
@@ -48,6 +49,7 @@ void SystemStatusTest::init()
     m_paths.cowspace = dir.filePath(u"cowspace"_s);
     m_paths.cmdline = dir.filePath(u"cmdline"_s);
     m_paths.meminfo = dir.filePath(u"meminfo"_s);
+    m_paths.stat = dir.filePath(u"stat"_s);
     m_paths.powerSupply = dir.filePath(u"power_supply"_s);
     m_paths.root = u"/"_s;
     m_volumes.clear();
@@ -122,6 +124,23 @@ void SystemStatusTest::memory()
     write(u"meminfo"_s, "garbage\nMemTotal: x kB\n");
     status->refresh();
     QCOMPARE(status->memoryTotal(), 0);
+}
+
+void SystemStatusTest::processor()
+{
+    write(u"stat"_s, "cpu  100 0 100 800 0 0 0 0 0 0\ncpu0 100 0 100 800 0 0 0 0 0 0\nintr 1\n");
+    auto status = make();
+    QCOMPARE(status->cpuUsage(), -1);
+    // 400 more ticks, 100 of them idle (or waiting for I/O): 75 % busy.
+    write(u"stat"_s, "cpu  300 0 200 850 50 0 0 0 0 0\n");
+    status->refresh();
+    QCOMPARE(status->cpuUsage(), 75);
+    // Nothing elapsed: the last value stays.
+    status->refresh();
+    QCOMPARE(status->cpuUsage(), 75);
+    write(u"stat"_s, "garbage\n");
+    status->refresh();
+    QCOMPARE(status->cpuUsage(), -1);
 }
 
 void SystemStatusTest::batteries()

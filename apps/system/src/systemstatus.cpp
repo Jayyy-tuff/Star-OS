@@ -82,6 +82,11 @@ qint64 SystemStatus::memoryAvailable() const
     return m_memoryAvailable;
 }
 
+int SystemStatus::cpuUsage() const
+{
+    return m_cpuUsage;
+}
+
 bool SystemStatus::batteryPresent() const
 {
     return m_batteryPresent;
@@ -119,6 +124,7 @@ void SystemStatus::refresh()
 {
     readStorage();
     readMemory();
+    readCpu();
     readBattery();
     Q_EMIT changed();
 }
@@ -174,6 +180,33 @@ void SystemStatus::readMemory()
             m_memoryAvailable = kib * 1024;
         }
     }
+}
+
+// The first line of /proc/stat: "cpu user nice system idle iowait irq
+// softirq steal ..." in clock ticks since boot; idle and iowait are idle.
+void SystemStatus::readCpu()
+{
+    const QString text = readText(m_paths.stat);
+    const QStringList fields = text.left(text.indexOf(QLatin1Char('\n'))).simplified().split(QLatin1Char(' '));
+    if (fields.size() < 5 || fields.at(0) != QLatin1String("cpu")) {
+        m_cpuUsage = -1;
+        return;
+    }
+    quint64 total = 0;
+    quint64 idle = 0;
+    for (qsizetype i = 1; i < std::min<qsizetype>(fields.size(), 9); ++i) {
+        const quint64 ticks = fields.at(i).toULongLong();
+        total += ticks;
+        if (i == 4 || i == 5) {
+            idle += ticks;
+        }
+    }
+    if (m_cpuTotal > 0 && total > m_cpuTotal && idle >= m_cpuIdle) {
+        const double busy = 1.0 - double(idle - m_cpuIdle) / double(total - m_cpuTotal);
+        m_cpuUsage = qBound(0, int(busy * 100.0 + 0.5), 100);
+    }
+    m_cpuIdle = idle;
+    m_cpuTotal = total;
 }
 
 void SystemStatus::readBattery()

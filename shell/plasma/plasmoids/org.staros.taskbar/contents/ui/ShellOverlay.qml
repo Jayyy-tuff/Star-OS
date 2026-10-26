@@ -8,7 +8,7 @@ import StarOS.System
 
 // The surface of the taskbar's panels: a transparent layer-shell Overlay
 // window over the whole screen hosting one of the Plasma-free start menu,
-// quick settings or calendar panels, each drawing a light dim and its glass
+// quick settings, calendar or clipboard panels, each drawing a light dim and its glass
 // panel above the taskbar. KWin creates a new surface on every show and
 // activates it, so the panel receives real keyboard focus.
 Window {
@@ -20,15 +20,17 @@ Window {
     property var display: null
     property var network: null
     property var notifications: null
+    property var clipboard: null
     property var pinnedIds: []
     property Component iconFallback: null
     property bool doNotDisturb: false
     // The taskbar's right end, in screen coordinates.
     property real anchorRight: win.width
-    // "start", "quick" or "calendar".
+    // "start", "quick", "calendar" or "clipboard".
     property string panel: "start"
     readonly property bool open: win.visible && win.current !== null && win.current.shown
-    readonly property Item current: win.panel === "quick" ? quick : win.panel === "calendar" ? calendar : menu
+    readonly property Item current: win.panel === "quick" ? quick : win.panel === "calendar" ? calendar
+        : win.panel === "clipboard" ? clipboardPanel : menu
 
     // Set once the surface was activated, so that only a later deactivation
     // (Alt+Tab, a click elsewhere) hides it.
@@ -50,7 +52,8 @@ Window {
     visible: false
     transientParent: null
     title: win.panel === "quick" ? qsTr("Quick settings")
-        : win.panel === "calendar" ? qsTr("Calendar and notifications") : qsTr("Star OS applications")
+        : win.panel === "calendar" ? qsTr("Calendar and notifications")
+        : win.panel === "clipboard" ? qsTr("Clipboard history") : qsTr("Star OS applications")
     color: "transparent"
 
     // An unknown scope gives a normal layer window in KWin; KWin 6.7.5 keeps
@@ -74,7 +77,7 @@ Window {
 
     function showPanel(name) {
         hideTimer.stop();
-        for (const item of [menu, quick, calendar]) {
+        for (const item of [menu, quick, calendar, clipboardPanel]) {
             item.shown = false;
         }
         win.panel = name;
@@ -183,9 +186,11 @@ Window {
         network: win.network
         status: win.systemStatus
         doNotDisturb: win.doNotDisturb
+        clipboardCount: win.clipboard ? win.clipboard.count : -1
         anchorRight: win.anchorRight
         onCloseRequested: win.hidePanel()
         onDoNotDisturbToggled: win.doNotDisturbToggled()
+        onClipboardRequested: win.showPanel("clipboard")
         onLensRequested: win.launch("org.staros.lens.desktop")
         onStorageRequested: win.launch("org.staros.storage.desktop")
         onSettingsRequested: win.launch("systemsettings.desktop")
@@ -216,5 +221,19 @@ Window {
             win.hidePanel();
         }
         onClearAllRequested: win.clearAllRequested()
+    }
+
+    ClipboardPanel {
+        id: clipboardPanel
+        anchors.fill: parent
+        visible: win.panel === "clipboard"
+        focus: win.panel === "clipboard"
+        shown: false
+        history: win.clipboard
+        onCloseRequested: win.hidePanel()
+        onCopied: {
+            console.info("STAROS-SHELL clipboard=copied");
+            win.hidePanel();
+        }
     }
 }

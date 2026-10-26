@@ -35,6 +35,8 @@ QtObject {
     property NetworkStatus network: NetworkStatus { interval: 0 }
     property DisplayControl display: DisplayControl {}
     property string networkState: network.state
+    property WidgetStore widgets: WidgetStore {}
+    property bool widgetsShown: widgets.value("zz-no-such-key", true)
 }
 )",
                           QUrl());
@@ -44,6 +46,7 @@ QtObject {
         QVERIFY(object->property("notes").toInt() >= 0);
         QCOMPARE(object->property("matches").toInt(), 0);
         QVERIFY(!object->property("networkState").toString().isEmpty());
+        QVERIFY(object->property("widgetsShown").toBool());
     }
 };
 

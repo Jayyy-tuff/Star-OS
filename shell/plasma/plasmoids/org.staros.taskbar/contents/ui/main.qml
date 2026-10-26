@@ -16,8 +16,8 @@ import StarOS.System
 // ToastWindow.qml are the only Star OS QML in the taskbar that imports
 // Plasma or KDE modules; every visible element comes from the Plasma-free
 // StarOS.Shell module. StarOS.System gives the applications, the system
-// status, sound, display and network; libnotificationmanager makes the shell
-// the notification server.
+// status, sound, display, network and the clipboard history;
+// libnotificationmanager makes the shell the notification server.
 //
 // The window list uses plasmashell's packaged window-management grant
 // (org.kde.plasmashell.desktop); nothing here bypasses KWin's permission checks.
@@ -76,6 +76,14 @@ ContainmentItem {
     DisplayControl {
         id: displayControl
         onNightLightChanged: console.info("STAROS-SHELL nightlight=" + nightLight + " available=" + nightLightAvailable)
+    }
+
+    // Meta+V opens it; copies survive the app that made them (ADR-0014).
+    ClipboardHistory {
+        id: clipboard
+        keysEnabled: true
+        onShortcutActivated: overlay.toggle("clipboard")
+        onCountChanged: console.info("STAROS-SHELL clipboard=" + count)
     }
 
     NetworkStatus {
@@ -191,6 +199,7 @@ ContainmentItem {
         display: displayControl
         network: network
         notifications: history
+        clipboard: clipboard
         pinnedIds: root.menuPins
         iconFallback: themeIcon
         doNotDisturb: root.doNotDisturb

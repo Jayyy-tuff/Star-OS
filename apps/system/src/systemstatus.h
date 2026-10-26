@@ -8,7 +8,8 @@
 
 #include <functional>
 
-// Storage, memory and battery for the taskbar meter, Files and Star Storage.
+// Storage, memory, processor and battery for the taskbar meter, the desktop's
+// System widget, Files and Star Storage.
 //
 // storageMode:
 //   "star-storage"  the live medium keeps changes on a Star Storage disk:
@@ -27,6 +28,9 @@ class SystemStatus : public QObject
     Q_PROPERTY(QString storageDevice READ storageDevice NOTIFY changed)
     Q_PROPERTY(qint64 memoryTotal READ memoryTotal NOTIFY changed)
     Q_PROPERTY(qint64 memoryAvailable READ memoryAvailable NOTIFY changed)
+    // Percent of processor time in use since the last refresh; -1 until two
+    // readings of /proc/stat exist.
+    Q_PROPERTY(int cpuUsage READ cpuUsage NOTIFY changed)
     Q_PROPERTY(bool batteryPresent READ batteryPresent NOTIFY changed)
     Q_PROPERTY(int batteryPercent READ batteryPercent NOTIFY changed)
     Q_PROPERTY(bool charging READ charging NOTIFY changed)
@@ -49,6 +53,7 @@ public:
         QString cowspace = QStringLiteral("/run/archiso/cowspace");
         QString cmdline = QStringLiteral("/proc/cmdline");
         QString meminfo = QStringLiteral("/proc/meminfo");
+        QString stat = QStringLiteral("/proc/stat");
         QString powerSupply = QStringLiteral("/sys/class/power_supply");
         QString root = QStringLiteral("/");
     };
@@ -63,6 +68,7 @@ public:
     QString storageDevice() const;
     qint64 memoryTotal() const;
     qint64 memoryAvailable() const;
+    int cpuUsage() const;
     bool batteryPresent() const;
     int batteryPercent() const;
     bool charging() const;
@@ -80,6 +86,7 @@ Q_SIGNALS:
 private:
     void readStorage();
     void readMemory();
+    void readCpu();
     void readBattery();
 
     Paths m_paths;
@@ -91,6 +98,9 @@ private:
     QString m_storageDevice;
     qint64 m_memoryTotal = 0;
     qint64 m_memoryAvailable = 0;
+    int m_cpuUsage = -1;
+    quint64 m_cpuIdle = 0;
+    quint64 m_cpuTotal = 0;
     bool m_batteryPresent = false;
     int m_batteryPercent = 0;
     bool m_charging = false;

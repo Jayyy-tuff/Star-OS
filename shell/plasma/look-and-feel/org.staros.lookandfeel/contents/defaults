@@ -1,0 +1,19 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# What applying the Star OS look sets (M0.5, ADR-0016); /etc/xdg/kdeglobals
+# carries the same for new users. Parts this package leaves out (splash,
+# logout) fall back to Breeze.
+[kdeglobals][General]
+ColorScheme=StarOS
+
+[kdeglobals][Icons]
+Theme=breeze-dark
+
+[kdeglobals][KDE]
+widgetStyle=Breeze
+
+[kwinrc][org.kde.kdecoration2]
+library=org.kde.breeze
+theme=Breeze
+
+[plasmarc][Theme]
+name=default

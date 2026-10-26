@@ -1,5 +1,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
-# Live medium (M0.2): the live user has no password, so the screen never locks.
+# Live medium (M0.2, M0.5 ADR-0016): the screen never locks by itself; Meta+L
+# and the start menu's Lock show the Star OS lock screen, and Return unlocks
+# the passwordless live user.
 [Daemon]
 Autolock=false
 LockOnResume=false

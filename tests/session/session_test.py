@@ -37,6 +37,20 @@ Scenarios:
       PipeWire's sink volume (QEMU has an HDA sound card for this)
   S20 a notification sent over D-Bus shows a toast and is listed in the
       clock's notification centre; "Clear all" empties it (ADR-0014)
+  S23 (right after S2) the Welcome tour opened at login: its first page,
+      Return turns the page, Escape skips it, and it is marked as seen in
+      ~/.config/staros-welcomerc (ADR-0017)
+  S24 Game Center opens from the start menu with its search, filters, game
+      mode and "Get games"; no games are installed, so it says so
+  S25 locking shows the Star OS lock screen (kscreenlocker with
+      org.staros.lookandfeel): the time, a "Password" field and "Unlock";
+      Return unlocks the passwordless live user (ADR-0016)
+  S21 a copy survives the app that made it (wl-copy exits, wl-paste still
+      reads it); Meta+V lists the copies newest first and Return puts the
+      chosen one back on the clipboard (ADR-0014)
+  S22 the desktop shows the Clock, Weather (asking for a city; nothing is
+      sent), System and Calendar widgets; hiding one in widgets.json hides
+      it without a restart
   Informational: S11 scaling with kscreen-doctor (AT-SPI geometry and screen
   dumps at 150, 200 and 100 %), S10 Orca (Meta+Alt+S, then a debug Orca's
   speech output for the launcher).
@@ -75,6 +89,8 @@ SETTINGS = "systemsettings"
 FILES = "org.staros.files"
 SUNSTORE = "org.staros.sunstore"
 LENS = "org.staros.lens"
+WELCOME = "org.staros.welcome"
+GAMES = "org.staros.games"
 # The live medium's writable layer (M0.3, scripts/build-iso.sh).
 KERNEL_PARAM = "cow_spacesize=50%"
 
@@ -349,6 +365,9 @@ def run_scenarios(s):
     loaded = s.wait_oracle(lambda e: True, 20, "a first report")
     s.check("S2", True, "KWin oracle reports: " + json.dumps(loaded))
 
+    # S23: the Welcome tour, before anything else wants the focus.
+    scenario_welcome(s)
+
     # S3: the taskbar over AT-SPI (the harness enables a11y as Orca would).
     s.atspi("enable")
     tree = s.atspi("walk", "plasmashell", "45")
@@ -545,6 +564,16 @@ def run_scenarios(s):
     # S19, S20: quick settings and notifications (ADR-0014).
     scenario_quick_settings(s)
     scenario_notifications(s)
+
+    # S21, S22: the clipboard history and the desktop widgets.
+    scenario_clipboard(s)
+    scenario_widgets(s)
+
+    # S24: Game Center (ADR-0017).
+    scenario_game_center(s)
+
+    # S25: the Star OS lock screen (ADR-0016).
+    scenario_lock_screen(s)
 
     # Informational until each has three consecutive green runs (design spec).
     for scenario in (scenario_scaling, scenario_orca):
@@ -758,6 +787,207 @@ def scenario_notifications(s):
 
 
 # S11: real scaling under KWin with kscreen-doctor (as the live user).
+def has_window(report, app):
+    return any(app in str(w.get("resourceClass", "")).lower() for w in report.get("windows", []))
+
+
+def dismiss_welcome(s, scenario, seconds=120):
+    """Skips the Welcome tour opened at login (Escape), so that it holds no
+    focus in later steps. Returns whether it was there."""
+    try:
+        report = s.wait_oracle(lambda e: has_window(e, WELCOME), seconds, f"a {WELCOME} window")
+    except CheckFailed:
+        s.record(scenario, "INFO", "no Welcome window appeared")
+        return False
+    if is_active(report, WELCOME):
+        s.keys("esc")
+    try:
+        s.wait_oracle(lambda e: not has_window(e, WELCOME), 20, f"no {WELCOME} window")
+        s.record(scenario, "INFO", "skipped the Welcome tour with Escape")
+    except CheckFailed:
+        s.as_user(["/usr/bin/pkill", "-x", "staros-welcome"], timeout=30)
+        s.record(scenario, "INFO", "closed the Welcome tour with pkill")
+    return True
+
+
+def scenario_welcome(s):
+    report = s.wait_oracle(lambda e: has_window(e, WELCOME), 120, f"a {WELCOME} window")
+    s.check("S23", is_active(report, WELCOME), f"the Welcome tour opened at login and is active: {json.dumps(report)}")
+    tree = wait_tree(s, "staros-welcome", lambda t: find(t, name="Take the tour", showing=True), 30)
+    s.check("S23", bool(find(tree, role="frame", name="Welcome to Star OS")),
+            f"its window is 'Welcome to Star OS': {showing_objects(tree)}")
+    s.check("S23", bool(find(tree, role=BUTTON, name="Take the tour", showing=True)), "the first page offers 'Take the tour'")
+    s.screenshot("S23-welcome")
+    focus = s.wait_focus(BUTTON, "Take the tour")
+    s.check("S23", focus.get("name") == "Take the tour", f"'Take the tour' has the focus: {json.dumps(focus)}")
+    s.keys("ret")
+    tree = wait_tree(s, "staros-welcome",
+                     lambda t: find(t, name="Everything starts with the Star key", showing=True), 15)
+    s.check("S23", bool(find(tree, name="Everything starts with the Star key", showing=True)),
+            f"Return turns to the start menu page: {showing_objects(tree)}")
+    s.keys("esc")
+    report = s.wait_oracle(lambda e: not has_window(e, WELCOME), 20, f"no {WELCOME} window")
+    s.check("S23", True, f"Escape skips the tour and closes it: {json.dumps(report)}")
+    code, out, _ = s.guest(["/usr/bin/cat", "/home/liveuser/.config/staros-welcomerc"])
+    s.check("S23", "Shown=true" in out, f"the tour is marked as seen: {out.strip()!r}")
+
+
+def scenario_game_center(s):
+    launch(s, "game center")
+    report = s.wait_oracle(lambda e: is_active(e, GAMES), 45, f"active {GAMES}")
+    s.check("S24", True, f"Game Center launched and active per KWin: {json.dumps(report)}")
+    tree = wait_tree(s, "staros-games", lambda t: find(t, name="Get games", showing=True), 30)
+    with open(os.path.join(s.log_dir, "atspi-games.json"), "w") as f:
+        json.dump(tree, f, indent=1)
+    for role, name in (("text", "Search games"), (None, "Steam"), (None, "Emulators"), (BUTTON, "Get games"),
+                       (None, "No games yet")):
+        s.check("S24", bool(find(tree, role=role, name=name, showing=True)),
+                f"Game Center shows {name!r}: {showing_objects(tree, 60)}")
+    mode = find(tree, name="Game mode", showing=True)
+    s.check("S24", bool(mode), f"game mode is offered (gamemoderun is installed): {json.dumps(mode[:1])}")
+    focus = s.wait_focus("text", "Search games")
+    s.record("S24", "INFO", f"focus: {json.dumps(focus)}")
+    s.screenshot("S24-game-center")
+    s.keys("alt", "f4")
+    s.wait_oracle(lambda e: not has_window(e, GAMES), 20, f"no {GAMES} window")
+
+
+SCREENSAVER = ["/usr/bin/gdbus", "call", "--session", "--dest", "org.freedesktop.ScreenSaver",
+               "--object-path", "/ScreenSaver", "--method"]
+
+
+def screen_locked(s):
+    code, out, err = s.as_user(SCREENSAVER + ["org.freedesktop.ScreenSaver.GetActive"], timeout=30)
+    return code == 0 and "true" in out
+
+
+def wait_locked(s, locked, seconds):
+    deadline = time.monotonic() + seconds
+    while time.monotonic() < deadline:
+        if screen_locked(s) == locked:
+            return True
+        time.sleep(1)
+    return False
+
+
+def scenario_lock_screen(s):
+    code, out, err = s.as_user(SCREENSAVER + ["org.freedesktop.ScreenSaver.Lock"], timeout=30)
+    s.check("S25", code == 0, f"Lock answered: {(out + err).strip()!r}")
+    s.check("S25", wait_locked(s, True, 30), "the screen is locked (ScreenSaver.GetActive)")
+    time.sleep(3)
+    code, out, _ = s.guest(["/usr/bin/sh", "-c", "journalctl -b -o cat --no-pager -q | grep 'STAROS-LOCK' | tail -n 5"])
+    s.record("S25", "INFO", f"lock screen log: {out.strip()!r}")
+    s.check("S25", "STAROS-LOCK ready" in out, "the Star OS lock screen loaded (not the fallback)")
+    tree = wait_tree(s, "kscreenlocker_greet", lambda t: find(t, name="Unlock", showing=True), 30)
+    with open(os.path.join(s.log_dir, "atspi-lockscreen.json"), "w") as f:
+        json.dump(tree, f, indent=1)
+    s.record("S25", "INFO", f"lock screen objects: {showing_objects(tree, 40)}")
+    s.check("S25", bool(find(tree, name="Password", showing=True)) and bool(find(tree, name="Unlock", showing=True)),
+            "the lock screen shows 'Password' and 'Unlock'")
+    s.screenshot("S25-lock-screen")
+    s.keys("ret")
+    unlocked = wait_locked(s, False, 30)
+    if not unlocked:
+        # Leave the session usable for the scenarios after this one.
+        s.as_user(["/usr/bin/loginctl", "unlock-session"], timeout=30)
+    s.check("S25", unlocked, "Return unlocked the live user")
+    s.screenshot("S25-unlocked")
+
+
+def paste(s):
+    code, out, err = s.as_user(["/usr/bin/wl-paste", "--no-newline"], timeout=30)
+    return code, out if code == 0 else (out + err).strip()
+
+
+def wl_copy(s, text):
+    """wl-copy forks and serves the copy until it is replaced or killed."""
+    return s.as_user(["/usr/bin/sh", "-c", f"/usr/bin/wl-copy {shlex.quote(text)} </dev/null >/dev/null 2>&1"],
+                     timeout=30)
+
+
+def scenario_clipboard(s):
+    first, second = "Star clipboard test", "Second copy"
+    code, _, err = wl_copy(s, first)
+    s.check("S21", code == 0, f"wl-copy ran: {err.strip()!r}")
+    time.sleep(2)
+    code, out = paste(s)
+    s.check("S21", code == 0 and out == first, f"wl-paste reads the copy: {out!r}")
+    # The app that owned the copy quits: the shell offers it again.
+    s.as_user(["/usr/bin/pkill", "-x", "wl-copy"], timeout=30)
+    deadline = time.monotonic() + 15
+    while time.monotonic() < deadline:
+        time.sleep(1)
+        code, out = paste(s)
+        if code == 0 and out == first:
+            break
+    s.check("S21", code == 0 and out == first, f"after wl-copy exited, wl-paste still reads it: {out!r}")
+    wl_copy(s, second)
+    time.sleep(2)
+    s.keys("meta_l", "v")
+    tree = wait_tree(s, "plasmashell", lambda t: find(t, role="frame", name="Clipboard history", showing=True), 20)
+    frames = find(tree, role="frame", name="Clipboard history", showing=True)
+    s.check("S21", bool(frames), f"Meta+V opens the clipboard history: {showing_objects(tree, 60)}")
+    panel = frames[0] if frames else {}
+    lists = find(panel, role="list", name="Copies", showing=True)
+    rows = [n.get("name") for n in find(lists[0], role=BUTTON, showing=True)] if lists else []
+    s.record("S21", "INFO", f"copies: {json.dumps(rows)}")
+    s.check("S21", rows[:2] == [second, first], f"newest first: {json.dumps(rows[:2])}")
+    s.screenshot("S21-clipboard")
+    focus = s.wait_focus(BUTTON, second)
+    s.check("S21", focus.get("name") == second, f"the newest copy has the focus: {json.dumps(focus)}")
+    s.keys("down")
+    focus = s.wait_focus(BUTTON, first)
+    s.keys("ret")
+    time.sleep(2)
+    code, out = paste(s)
+    s.check("S21", code == 0 and out == first, f"Return put the older copy back: {out!r}")
+    tree = s.atspi("walk", "plasmashell", "30")
+    s.check("S21", not find(tree, role="frame", name="Clipboard history", showing=True), "the panel closed")
+    s.as_user(["/usr/bin/pkill", "-x", "wl-copy"], timeout=30)
+
+
+WIDGETS = ("Clock", "Weather", "System", "Calendar")
+WIDGETS_FILE = "/home/liveuser/.local/share/staros/widgets.json"
+
+
+def shown_widgets(tree):
+    panes = find(tree, name="Desktop widgets")
+    if not panes:
+        return []
+    # Qt maps Accessible.Grouping to "panel" or "grouping" depending on the
+    # version; the widgets are the showing objects with their names.
+    names = []
+    for node in find(panes[0], showing=True):
+        if node.get("name") in WIDGETS and node.get("name") not in names and "check box" not in str(node.get("role")):
+            names.append(node.get("name"))
+    return names
+
+
+def scenario_widgets(s):
+    tree = wait_tree(s, "plasmashell", lambda t: len(shown_widgets(t)) == 4, 30)
+    s.check("S22", shown_widgets(tree) == list(WIDGETS), f"the desktop shows {json.dumps(shown_widgets(tree))}")
+    weather = [n for n in find(tree, name="Weather", showing=True) if n.get("description")]
+    s.check("S22", bool(weather) and weather[0].get("description") == "Choose a city",
+            f"the weather asks for a city first: {json.dumps(weather[:1])[:300]}")
+    cpu = [n.get("name") for n in find(tree, showing=True) if str(n.get("name", "")).startswith("Processor: ")]
+    s.record("S22", "INFO", f"system widget: {json.dumps(cpu)}")
+    s.check("S22", bool(cpu) and cpu[0].endswith("%"), f"the System widget measures the processor: {cpu}")
+    clock = [n for n in find(tree, name="Clock", showing=True) if n.get("description")]
+    s.record("S22", "INFO", f"clock: {clock[0].get('description') if clock else None!r}")
+    s.screenshot("S22-widgets")
+    hidden = '{"version": 1, "shown": {"calendar": false}}'
+    s.as_user(["/usr/bin/sh", "-c", f"mkdir -p $(dirname {WIDGETS_FILE}) && printf '%s' {shlex.quote(hidden)} > {WIDGETS_FILE}"],
+              timeout=30)
+    tree = wait_tree(s, "plasmashell", lambda t: "Calendar" not in shown_widgets(t), 20)
+    s.check("S22", shown_widgets(tree) == ["Clock", "Weather", "System"],
+            f"hiding the calendar in widgets.json hides it: {json.dumps(shown_widgets(tree))}")
+    s.as_user(["/usr/bin/rm", "-f", WIDGETS_FILE], timeout=30)
+    tree = wait_tree(s, "plasmashell", lambda t: len(shown_widgets(t)) == 4, 20)
+    s.check("S22", len(shown_widgets(tree)) == 4, "removing the file shows every widget again")
+    code, out, _ = s.guest(["/usr/bin/sh", "-c", "journalctl -b -o cat --no-pager -q | grep -ci open-meteo || true"])
+    s.record("S22", "INFO", f"journal lines naming open-meteo: {out.strip()}")
+
+
 def scenario_scaling(s):
     code, out, err = s.as_user(["/usr/bin/kscreen-doctor", "-j"], timeout=30)
     outputs = json.loads(out[out.find("{"):])["outputs"]

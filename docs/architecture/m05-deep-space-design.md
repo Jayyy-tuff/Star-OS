@@ -126,22 +126,41 @@ run.
 
 ## 6. Clipboard history (ADR-0014)
 
-- `ClipboardHistory` in `StarOS.System` (KSystemClipboard,
-  `ext_data_control`): keeps the last 20 text and image copies in memory
-  (never on disk), and when the clipboard empties because the app that owned
-  it closed, offers the last copy again. Meta+V (KGlobalAccel, component
-  "staros-shell") opens the clipboard panel above the taskbar; Return copies
-  the chosen item back; Delete removes it; "Clear" empties the history.
+- `ClipboardHistory` in `StarOS.System` (KSystemClipboard, the Wayland
+  data-control protocol inside plasmashell): keeps the last 20 copies, text
+  and at most 5 images, in memory only (never on disk), newest first and
+  without duplicates. Copies an app marks as secret
+  (`x-kde-passwordManagerHint`, as password managers do) are not kept. When
+  the clipboard empties because the app that owned it closed, it offers the
+  newest copy again (at most once a second).
+- Meta+V (KGlobalAccel, component "staros-shell") opens `ClipboardPanel`
+  above the taskbar, centred; quick settings' Clipboard tile shows the count
+  and opens it too. Return or a click copies the chosen item back and closes
+  the panel; Delete or the row's × forgets it; "Clear" forgets every copy
+  and empties the clipboard.
+- The image adds `wl-clipboard` (`wl-copy`, `wl-paste`), which the session
+  test uses to check that a copy outlives the app that made it.
 
 ## 7. Desktop widgets
 
-- The desktop gains a widgets column (top right): Clock, Weather, System
-  (processor, memory, storage) and Calendar; each can be removed and added
-  back from a "Widgets" button, positions saved in
-  `~/.local/share/staros/widgets.json` like the notes.
-- Weather (ADR-0015) asks for a city first; only then does it contact
-  Open-Meteo (`geocoding-api.open-meteo.com`, `api.open-meteo.com`, no key),
-  every 30 minutes while shown. Without network it says so.
+- `DesktopWidgets` draws a column at the top right, under a "Widgets" button
+  next to "New note": Clock (time and date), Weather, System (processor,
+  memory and storage in use; `SystemStatus` gains `cpuUsage` from
+  `/proc/stat`) and Calendar (`MonthGrid`, shared with the clock's panel).
+  The Widgets menu has a check box per widget. The order is fixed; which
+  widgets are shown and the weather's place are saved by `WidgetStore` in
+  `~/.local/share/staros/widgets.json` (on Star Storage when the live medium
+  keeps changes there), and changes to that file apply at once. Widgets
+  cannot be dragged yet (unlike the notes); that is left for a later
+  milestone.
+- Weather (ADR-0015) asks for a city first and sends nothing until one is
+  chosen. Then it asks Open-Meteo (`geocoding-api.open-meteo.com` for the
+  place, `api.open-meteo.com` for the weather now and the next three days,
+  no key) when the place is chosen, every 30 minutes while it is shown, and
+  when it is shown again after half an hour. Offline it keeps the last
+  values and says when they are from, or says it cannot reach Open-Meteo
+  and offers "Try again". Fahrenheit follows the locale's measurement
+  system.
 
 ## 8. Lock screen and session look (ADR-0016)
 

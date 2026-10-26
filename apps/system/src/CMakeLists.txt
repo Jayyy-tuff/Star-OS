@@ -10,15 +10,17 @@ qt_add_qml_module(staros_system
     SOURCES
         applicationsmodel.cpp applicationsmodel.h
         audiocontrol.cpp audiocontrol.h
+        clipboardhistory.cpp clipboardhistory.h
         displaycontrol.cpp displaycontrol.h
         networkstatus.cpp networkstatus.h
         notesstore.cpp notesstore.h
         systemstatus.cpp systemstatus.h
+        widgetstore.cpp widgetstore.h
 )
 
 target_link_libraries(staros_system PRIVATE
     Qt6::Core Qt6::DBus Qt6::Gui Qt6::Qml
-    KF6::ConfigCore KF6::GlobalAccel KF6::KIOGui KF6::PulseAudioQt KF6::Service
+    KF6::ConfigCore KF6::GlobalAccel KF6::GuiAddons KF6::KIOGui KF6::PulseAudioQt KF6::Service
 )
 # KDECMakeSettings drops the prefix of MODULE libraries; the QML engine looks
 # for lib<plugin>.so.

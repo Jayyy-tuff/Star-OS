@@ -15,7 +15,8 @@ virtio disk. Three boots share it and the OVMF variables file:
      taskbar's Quick settings says "Star Storage"; a marker file is written
      in liveuser's home; "Always start with Star Storage" is switched on in
      the app; the guest powers off.
-  B3 systemd-boot's default is now Star Storage: the marker is still there.
+  B3 systemd-boot's default is now Star Storage: the marker is still there,
+     and the Welcome tour skipped in B2 does not open again.
 
 Prints 'EVIDENCE <step> PASS|FAIL|INFO <detail>' lines and writes
 storage-result.json. Exit status: 0 passed, 1 a check failed, 2 setup error.
@@ -26,6 +27,7 @@ import json
 import os
 import subprocess
 import sys
+import time
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(HERE, "..", "session"))
@@ -63,6 +65,10 @@ def boot(s, iso, name, vars_file, disk):
     s.check(name, script_id not in (None, "-1"), f"KWin oracle loaded (id {script_id}) {err}")
     s.atspi("enable")
     code, out, _ = s.guest(["/usr/bin/cat", "/proc/cmdline"])
+    if name != "B3":
+        # The Welcome tour opens at login until skipped (ADR-0017); on the
+        # third start Star Storage has kept that it was skipped.
+        session_test.dismiss_welcome(s, name)
     s.record(name, "INFO", f"kernel command line: {out.strip()}")
     return out.split()
 
@@ -189,6 +195,12 @@ def boot3(s, iso, vars_file, disk, name):
             f"the marker from the previous start is still there: {out.strip()!r}")
     code, out, _ = s.guest(["/usr/bin/findmnt", "-n", "-o", "SOURCE", "/run/archiso/cowspace"])
     s.record("B3", "INFO", f"copy-on-write space: {out.strip()}")
+    # B2 skipped the Welcome tour; Star Storage kept that, so it stays shut.
+    code, out, _ = s.guest(["/usr/bin/cat", "/home/liveuser/.config/staros-welcomerc"])
+    s.check("B3", "Shown=true" in out, f"the skipped tour is remembered: {out.strip()!r}")
+    time.sleep(10)
+    code, out, _ = s.guest(["/usr/bin/pgrep", "-u", "liveuser", "-x", "staros-welcome"])
+    s.check("B3", code != 0, f"the Welcome tour did not open again (pgrep exit {code}: {out.strip()!r})")
     s.screenshot("B3-desktop")
 
 

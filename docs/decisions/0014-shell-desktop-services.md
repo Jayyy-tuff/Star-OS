@@ -44,6 +44,8 @@ which ADR-0008 rules out.
   KConfig's notify flag (KWin's config watcher applies it).
 - Clipboard: `ClipboardHistory` keeps up to 20 copies in memory and offers
   the last one again when its owner disappears; Meta+V opens the history.
+  Copies marked secret by password managers are skipped. The image adds
+  `wl-clipboard` (GPL-3.0) for the command line and the session test.
 
 ## Consequences and trade-offs
 

@@ -216,10 +216,11 @@ append_packages() {
 install_shell_files() {
     local airootfs=$1
     mkdir -p -- "$airootfs/usr/lib/qt6/qml" "$airootfs/usr/share/plasma/shells" \
-        "$airootfs/usr/share/plasma/plasmoids"
+        "$airootfs/usr/share/plasma/plasmoids" "$airootfs/usr/share/plasma/look-and-feel"
     cp -a -- "$shell_src/qml/StarOS" "$airootfs/usr/lib/qt6/qml/"
     cp -a -- "$shell_src/plasma/shells/." "$airootfs/usr/share/plasma/shells/"
     cp -a -- "$shell_src/plasma/plasmoids/." "$airootfs/usr/share/plasma/plasmoids/"
+    cp -a -- "$shell_src/plasma/look-and-feel/." "$airootfs/usr/share/plasma/look-and-feel/"
     find "$airootfs/usr/lib/qt6/qml/StarOS" "$airootfs/usr/share/plasma" \
         -name '*.license' -type f -delete
     log "Installed Star OS shell files ($(find "$airootfs/usr/lib/qt6/qml/StarOS/Shell" \
@@ -231,6 +232,7 @@ shell_tree_hash() {
     local airootfs=$1
     (cd -- "$airootfs" && find usr/lib/qt6/qml/StarOS/Shell usr/share/plasma/shells/org.staros.shell \
         usr/share/plasma/plasmoids/org.staros.taskbar usr/share/plasma/plasmoids/org.staros.desktop \
+        usr/share/plasma/look-and-feel/org.staros.lookandfeel \
         -type f -print0 | LC_ALL=C sort -z | xargs -0 sha256sum) | sha256sum | cut -d' ' -f1
 }
 

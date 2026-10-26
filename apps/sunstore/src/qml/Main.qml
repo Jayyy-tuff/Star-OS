@@ -15,6 +15,9 @@ Window {
     title: qsTr("Sun Store")
     color: Theme.glassFallback
 
+    // "starpicks", or a category given on the command line (--category).
+    property string initialCategory: "starpicks"
+
     Store {
         id: backend
     }
@@ -32,9 +35,9 @@ Window {
         onStorageRequested: backend.openStarStorage()
     }
 
-    // Discover opens on Star picks.
+    // Discover opens on Star picks unless asked for a category.
     Component.onCompleted: {
-        backend.apps.category = "starpicks";
+        backend.apps.category = window.initialCategory;
         backend.start();
     }
 }

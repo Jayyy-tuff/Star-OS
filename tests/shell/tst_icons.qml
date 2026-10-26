@@ -69,6 +69,8 @@ Item {
                 {tag: "org.staros.sunstore.desktop", id: "org.staros.sunstore.desktop", file: "sun-store.svg"},
                 {tag: "org.staros.lens.desktop", id: "org.staros.lens.desktop", file: "lens.svg"},
                 {tag: "org.staros.storage", id: "org.staros.storage", file: "storage.svg"},
+                {tag: "org.staros.games.desktop", id: "org.staros.games.desktop", file: "games.svg"},
+                {tag: "org.staros.welcome.desktop", id: "org.staros.welcome.desktop", file: "welcome.svg"},
                 {tag: "firefox.desktop (theme icon)", id: "firefox.desktop", file: ""},
                 {tag: "moon", id: "moon", file: "moon-browser.svg"},
                 {tag: "moon-browser", id: "moon-browser", file: "moon-browser.svg"},

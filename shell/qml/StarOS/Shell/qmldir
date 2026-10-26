@@ -28,8 +28,17 @@ QuickSettings 1.0 QuickSettings.qml
 NotificationCard 1.0 NotificationCard.qml
 NotificationToasts 1.0 NotificationToasts.qml
 CalendarPanel 1.0 CalendarPanel.qml
+MonthGrid 1.0 MonthGrid.qml
+ClipboardPanel 1.0 ClipboardPanel.qml
+WidgetCard 1.0 WidgetCard.qml
+ClockWidget 1.0 ClockWidget.qml
+WeatherWidget 1.0 WeatherWidget.qml
+SystemWidget 1.0 SystemWidget.qml
+CalendarWidget 1.0 CalendarWidget.qml
+DesktopWidgets 1.0 DesktopWidgets.qml
 SystemMeter 1.0 SystemMeter.qml
 StickyNote 1.0 StickyNote.qml
 NotesBoard 1.0 NotesBoard.qml
 QuickAnswers 1.0 quickanswers.js
 Status 1.0 status.js
+Weather 1.0 weather.js

@@ -48,6 +48,7 @@ shell_paths=(
     usr/share/plasma/shells/org.staros.shell
     usr/share/plasma/plasmoids/org.staros.taskbar
     usr/share/plasma/plasmoids/org.staros.desktop
+    usr/share/plasma/look-and-feel/org.staros.lookandfeel
 )
 
 no_forbidden_env() {
@@ -207,17 +208,17 @@ overlay_paths_unowned() {
 
 star_os_apps_installed() {
     local pkg app
-    for pkg in staros-files staros-sunstore staros-lens staros-storage; do
+    for pkg in staros-files staros-sunstore staros-lens staros-storage staros-games staros-welcome; do
         pacman_root -Q "$pkg" >/dev/null 2>&1 || { echo "    $pkg is not installed"; return 1; }
     done
-    for app in staros-files staros-sunstore staros-lens staros-storage; do
+    for app in staros-files staros-sunstore staros-lens staros-storage staros-games staros-welcome; do
         [[ -x $root/usr/bin/$app ]] || { echo "    /usr/bin/$app is missing"; return 1; }
     done
 }
 
 app_entries_valid() {
     local entry
-    for entry in org.staros.files org.staros.sunstore org.staros.lens org.staros.storage; do
+    for entry in org.staros.files org.staros.sunstore org.staros.lens org.staros.storage org.staros.games org.staros.welcome; do
         desktop-file-validate "$root/usr/share/applications/$entry.desktop" \
             || { echo "    $entry.desktop is not valid"; return 1; }
     done
@@ -229,6 +230,7 @@ app_entries_valid() {
 catalogue_apps=(
     org.kde.konsole systemsettings org.staros.files org.staros.sunstore org.staros.lens
     org.staros.storage firefox vlc org.kde.okular org.kde.gwenview org.kde.ark org.kde.kwrite org.kde.kcalc
+    org.staros.games org.staros.welcome
 )
 
 catalogue_apps_present() {
@@ -301,6 +303,31 @@ live_iwd_policy() {
     fi
 }
 
+# The Welcome tour opens at login until it is finished; Game Center can use
+# GameMode (ADR-0017).
+welcome_autostart() {
+    local file="$root/etc/xdg/autostart/org.staros.welcome.desktop"
+    [[ -f $file ]] && grep -qx 'Exec=staros-welcome --autostart' "$file" \
+        && [[ $(pacman_root -Qqo "$file" 2>/dev/null) == staros-welcome ]]
+}
+
+gamemode_available() {
+    [[ -x $root/usr/bin/gamemoderun ]] && pacman_root -Q gamemode >/dev/null 2>&1
+}
+
+# The Star OS look: its lock screen, the colour scheme, and manual locking
+# allowed for the live user while the screen never locks by itself (ADR-0016).
+star_os_look() {
+    local home="$root/home/liveuser/.config"
+    [[ -f $root/usr/share/plasma/look-and-feel/org.staros.lookandfeel/contents/lockscreen/LockScreen.qml ]] \
+        && [[ -f $root/usr/share/color-schemes/StarOS.colors ]] \
+        && grep -qx 'LookAndFeelPackage=org.staros.lookandfeel' "$root/etc/xdg/kdeglobals" \
+        && grep -qx 'ColorScheme=StarOS' "$root/etc/xdg/kdeglobals" \
+        && ! grep -qs 'lock_screen=false' "$home/kdeglobals" "$root/etc/xdg/kdeglobals" \
+        && grep -qx 'Autolock=false' "$home/kscreenlockerrc" \
+        && grep -qx 'LockOnResume=false' "$home/kscreenlockerrc"
+}
+
 flathub_file_shipped() {
     local file="$root/usr/share/staros-sunstore/flathub.flatpakrepo"
     [[ -f $file ]] && grep -qx '\[Flatpak Repo\]' "$file" \
@@ -358,6 +385,9 @@ check "the Star Storage helper is root's only through its polkit action" storage
 check "Star Lens has KWin's screenshot grant, its shortcut and English OCR data" lens_screenshot_grant
 check "the live iwd D-Bus rule allows only iwd, only for liveuser" live_iwd_policy
 check "staros-sunstore ships Flathub's remote file" flathub_file_shipped
+check "the Welcome tour starts at login until finished" welcome_autostart
+check "GameMode is installed for Game Center" gamemode_available
+check "the Star OS look, colours and lock screen; no automatic lock" star_os_look
 check "the pinned apps have their desktop files" catalogue_apps_present
 check "StarOS.System is installed by staros-system" star_os_system_module
 check "Inter is the UI font" inter_ui_font

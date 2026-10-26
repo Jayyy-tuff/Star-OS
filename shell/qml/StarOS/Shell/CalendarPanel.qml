@@ -24,17 +24,8 @@ FocusScope {
     // The first day of the month on show.
     property date shownMonth: new Date(root.now.getFullYear(), root.now.getMonth(), 1)
 
-    readonly property int firstDayOfWeek: Qt.locale().firstDayOfWeek
-    // 42 days from the start of the week that holds the 1st.
-    readonly property var days: {
-        const first = new Date(root.shownMonth.getFullYear(), root.shownMonth.getMonth(), 1);
-        const lead = (first.getDay() - root.firstDayOfWeek + 7) % 7;
-        const list = [];
-        for (let i = 0; i < 42; ++i) {
-            list.push(new Date(first.getFullYear(), first.getMonth(), 1 - lead + i));
-        }
-        return list;
-    }
+    readonly property int firstDayOfWeek: grid.firstDayOfWeek
+    readonly property var days: grid.days
 
     signal closeRequested()
     signal notificationCloseRequested(int row)
@@ -59,10 +50,6 @@ FocusScope {
 
     function showMonth(offset) {
         root.shownMonth = new Date(root.shownMonth.getFullYear(), root.shownMonth.getMonth() + offset, 1);
-    }
-
-    function sameDay(a, b) {
-        return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
     }
 
     Keys.onEscapePressed: event => {
@@ -177,76 +164,12 @@ FocusScope {
                 }
             }
 
-            Grid {
+            MonthGrid {
                 id: grid
                 objectName: "days"
-                columns: 7
                 width: parent.width
-
-                readonly property real cellWidth: width / 7
-                readonly property real cellHeight: Math.round(2.1 * Theme.gridUnit)
-
-                Accessible.role: Accessible.Table
-                Accessible.name: Qt.formatDate(root.shownMonth, "MMMM yyyy")
-
-                Repeater {
-                    model: 7
-
-                    Text {
-                        required property int index
-
-                        width: grid.cellWidth
-                        height: Math.round(1.5 * Theme.gridUnit)
-                        horizontalAlignment: Text.AlignHCenter
-                        verticalAlignment: Text.AlignVCenter
-                        text: Qt.locale().dayName((root.firstDayOfWeek + index) % 7, Locale.NarrowFormat)
-                        color: Theme.textSecondary
-                        font.family: Theme.metrics.font.family
-                        font.pixelSize: Theme.smallPixelSize
-                        Accessible.ignored: true
-                    }
-                }
-
-                Repeater {
-                    model: root.days
-
-                    Item {
-                        id: cell
-
-                        required property var modelData
-                        required property int index
-
-                        readonly property bool today: root.sameDay(cell.modelData, root.now)
-                        readonly property bool inMonth: cell.modelData.getMonth() === root.shownMonth.getMonth()
-
-                        width: grid.cellWidth
-                        height: grid.cellHeight
-                        objectName: cell.today ? "todayCell" : ""
-
-                        Accessible.role: Accessible.StaticText
-                        Accessible.name: Qt.formatDate(cell.modelData, "dddd d MMMM yyyy") + (cell.today ? ", " + qsTr("today") : "")
-
-                        Rectangle {
-                            anchors.centerIn: parent
-                            width: Math.min(parent.width, parent.height) - 2
-                            height: width
-                            radius: width / 2
-                            visible: cell.today
-                            gradient: Theme.accentGradient
-                        }
-
-                        Text {
-                            anchors.centerIn: parent
-                            text: String(cell.modelData.getDate())
-                            color: cell.today ? Theme.accentText : cell.inMonth ? Theme.text : Theme.textSecondary
-                            opacity: cell.inMonth || cell.today ? 1 : 0.55
-                            font.family: Theme.metrics.font.family
-                            font.pixelSize: Math.round(Theme.fontSize)
-                            font.weight: cell.today ? Font.Bold : Font.Normal
-                            Accessible.ignored: true
-                        }
-                    }
-                }
+                now: root.now
+                shownMonth: root.shownMonth
             }
         }
     }
