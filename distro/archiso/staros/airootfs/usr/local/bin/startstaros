@@ -6,6 +6,15 @@
 # scripts/ci/check-image-policy.sh.
 export PLASMA_DEFAULT_SHELL=org.staros.shell
 
+# Apps that Sun Store installs with "flatpak --user" appear in Applications at
+# once (M0.5, ADR-0013). The session starts from a system service, whose
+# environment has only the system-wide Flatpak exports.
+user_exports="${XDG_DATA_HOME:-$HOME/.local/share}/flatpak/exports/share"
+case ":${XDG_DATA_DIRS:-}:" in
+    *":$user_exports:"*) ;;
+    *) export XDG_DATA_DIRS="$user_exports:${XDG_DATA_DIRS:-/usr/local/share:/usr/share}" ;;
+esac
+
 # archiso 'speech' boot entries (accessibility=on): kaccess starts Orca at login
 # when kaccessrc [ScreenReader] Enabled=true. Applied once per boot, so that a
 # later Meta+Alt+S toggle-off survives a re-login.
