@@ -24,6 +24,10 @@ Item {
     property int criticalUrgency: 4
 
     readonly property int count: list.count
+    // The model's rows, followed through its signals. A list view counts
+    // its rows only when it lays them out, which never happens in a hidden
+    // window: a window that shows itself for toasts must use this.
+    property int rows: 0
 
     signal expireRequested(int row)
     signal closeRequested(int row)
@@ -35,6 +39,31 @@ Item {
 
     Accessible.role: Accessible.List
     Accessible.name: qsTr("New notifications")
+
+    function updateRows() {
+        root.rows = root.model && typeof root.model.rowCount === "function" ? root.model.rowCount() : 0;
+    }
+
+    onModelChanged: root.updateRows()
+    Component.onCompleted: root.updateRows()
+
+    Connections {
+        target: root.model
+        ignoreUnknownSignals: true
+
+        function onRowsInserted() {
+            root.updateRows();
+        }
+        function onRowsRemoved() {
+            root.updateRows();
+        }
+        function onModelReset() {
+            root.updateRows();
+        }
+        function onLayoutChanged() {
+            root.updateRows();
+        }
+    }
 
     ListView {
         id: list

@@ -60,6 +60,25 @@ Item {
         model: toastModel
     }
 
+    // As in the taskbar's toast window: hidden until there is a toast.
+    ListModel {
+        id: hiddenModel
+    }
+
+    Window {
+        id: hiddenWindow
+        width: 420
+        height: 300
+        visible: false
+
+        NotificationToasts {
+            id: hiddenToasts
+            width: 400
+            height: 280
+            model: hiddenModel
+        }
+    }
+
     SignalSpy {
         id: expireSpy
         target: toasts
@@ -234,6 +253,22 @@ Item {
             verify(findChild(toastItem(0), "timeLeft").visible, "the time bar shows");
             tryVerify(() => expireSpy.count === 1, 3000, "the toast expires");
             compare(expireSpy.signalArguments[0][0], 0);
+        }
+
+        function test_rows_in_a_hidden_window() {
+            hiddenModel.clear();
+            compare(hiddenToasts.rows, 0);
+            hiddenModel.append(notification("While hidden", {timeout: 0}));
+            // The model's signals count it at once, laid out or not.
+            compare(hiddenToasts.rows, 1);
+            hiddenModel.append(notification("Second", {timeout: 0}));
+            compare(hiddenToasts.rows, 2);
+            hiddenModel.remove(0);
+            compare(hiddenToasts.rows, 1);
+            hiddenModel.clear();
+            compare(hiddenToasts.rows, 0);
+            toastModel.append(notification("Shown", {timeout: 0}));
+            compare(toasts.rows, 1);
         }
 
         function test_critical_and_persistent_toasts_stay() {
