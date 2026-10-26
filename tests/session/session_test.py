@@ -903,13 +903,16 @@ def scenario_lock_screen(s):
     s.check("S25", code == 0, f"Lock answered: {(out + err).strip()!r}")
     s.check("S25", wait_locked(s, True, 30), "the screen is locked (ScreenSaver.GetActive)")
     time.sleep(3)
-    code, out, _ = s.guest(["/usr/bin/sh", "-c", "journalctl -b -o cat --no-pager -q | grep 'STAROS-LOCK' | tail -n 5"])
-    s.record("S25", "INFO", f"lock screen log: {out.strip()!r}")
-    s.check("S25", "STAROS-LOCK ready" in out, "the Star OS lock screen loaded (not the fallback)")
     tree = wait_tree(s, "kscreenlocker_greet", lambda t: find(t, name="Unlock", showing=True), 30)
     with open(os.path.join(s.log_dir, "atspi-lockscreen.json"), "w") as f:
         json.dump(tree, f, indent=1)
     s.record("S25", "INFO", f"lock screen objects: {showing_objects(tree, 40)}")
+    code, out, _ = s.guest(["/usr/bin/sh", "-c", "journalctl -b -o cat --no-pager -q | grep 'STAROS-LOCK' | tail -n 5"])
+    s.record("S25", "INFO", f"lock screen log: {out.strip()!r}")
+    # Ours logs 'STAROS-LOCK ready' and names itself 'Screen locked';
+    # kscreenlocker's built-in fallback does neither.
+    s.check("S25", "STAROS-LOCK ready" in out or bool(find(tree, name="Screen locked")),
+            "the Star OS lock screen loaded (not the fallback)")
     s.check("S25", bool(find(tree, name="Password", showing=True)) and bool(find(tree, name="Unlock", showing=True)),
             "the lock screen shows 'Password' and 'Unlock'")
     s.screenshot("S25-lock-screen")
