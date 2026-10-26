@@ -115,7 +115,8 @@ ContainmentItem {
         sortMode: NotificationManager.Notifications.SortByDate
         sortOrder: Qt.DescendingOrder
         groupMode: NotificationManager.Notifications.GroupDisabled
-        onCountChanged: console.info("STAROS-SHELL toasts=" + count)
+        // countChanged comes before the model's rows change; read it after.
+        onCountChanged: Qt.callLater(root.logToasts)
     }
 
     // Every notification of this session, for the notification centre.
@@ -129,7 +130,7 @@ ContainmentItem {
         sortMode: NotificationManager.Notifications.SortByDate
         sortOrder: Qt.DescendingOrder
         groupMode: NotificationManager.Notifications.GroupDisabled
-        onCountChanged: console.info("STAROS-SHELL notifications=" + count)
+        onCountChanged: Qt.callLater(root.logNotifications)
     }
 
     // Pinned apps and windows: a running pinned app takes its pin's place;
@@ -253,6 +254,14 @@ ContainmentItem {
         notificationSettings.save();
         NotificationManager.Server.inhibited = on;
         console.info("STAROS-SHELL dnd=" + on);
+    }
+
+    function logToasts() {
+        console.info("STAROS-SHELL toasts=" + popups.count);
+    }
+
+    function logNotifications() {
+        console.info("STAROS-SHELL notifications=" + history.count);
     }
 
     function callSession(service, path, iface, member) {

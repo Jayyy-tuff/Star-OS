@@ -249,6 +249,52 @@ Item {
         showJobs: false
         urgencies: NotificationManager.Notifications.NormalUrgency | NotificationManager.Notifications.CriticalUrgency
     }
+    // The history model and variants, to find the setting that keeps
+    // every notification out of it.
+    NotificationManager.Notifications {
+        id: h1
+        showExpired: true
+        showDismissed: true
+    }
+    NotificationManager.Notifications {
+        id: h2
+        showExpired: true
+    }
+    NotificationManager.Notifications {
+        id: h3
+        showDismissed: true
+    }
+    NotificationManager.Notifications {
+        id: h4
+        showExpired: true
+        showDismissed: true
+        showJobs: false
+        sortMode: NotificationManager.Notifications.SortByDate
+        sortOrder: Qt.DescendingOrder
+        groupMode: NotificationManager.Notifications.GroupDisabled
+    }
+    NotificationManager.Notifications {
+        id: h5
+        showExpired: true
+        showDismissed: true
+        showJobs: false
+        blacklistedDesktopEntries: notificationSettings.historyBlacklistedApplications
+        blacklistedNotifyRcNames: notificationSettings.historyBlacklistedServices
+        urgencies: NotificationManager.Notifications.NormalUrgency | NotificationManager.Notifications.CriticalUrgency
+        sortMode: NotificationManager.Notifications.SortByDate
+        sortOrder: Qt.DescendingOrder
+        groupMode: NotificationManager.Notifications.GroupDisabled
+    }
+    NotificationManager.Notifications {
+        id: h6
+        showExpired: false
+        showDismissed: false
+        showJobs: false
+        blacklistedDesktopEntries: notificationSettings.historyBlacklistedApplications
+        blacklistedNotifyRcNames: notificationSettings.historyBlacklistedServices
+    }
+    property bool expiredOne: false
+
     ListView {
         id: view
         width: 100
@@ -267,7 +313,13 @@ Item {
     function state() {
         return "popups=" + popups.count + "/" + popups.rowCount() + " history=" + history.count + "/" + history.rowCount()
             + " plain=" + plain.count + "/" + plain.rowCount() + " noUrgencies=" + noUrgencies.rowCount()
-            + " noLimit=" + noLimit.rowCount() + " view=" + view.count + " valid=" + NotificationManager.Server.valid
+            + " noLimit=" + noLimit.rowCount() + " view=" + view.count
+            + " h1..h6=" + [h1, h2, h3, h4, h5, h6].map(m => m.rowCount()).join(",")
+            + " history.active=" + history.activeNotificationsCount + " history.expired=" + history.expiredNotificationsCount
+            + " blacklists=" + JSON.stringify([notificationSettings.historyBlacklistedApplications,
+                                               notificationSettings.historyBlacklistedServices,
+                                               notificationSettings.popupBlacklistedApplications])
+            + " valid=" + NotificationManager.Server.valid
             + " inhibited=" + NotificationManager.Server.inhibited + " dnd=" + root.doNotDisturb
             + " until=" + notificationSettings.notificationsInhibitedUntil + " urgencies=" + popups.urgencies
             + " enums=" + NotificationManager.Notifications.LowUrgency + "," + NotificationManager.Notifications.NormalUrgency
@@ -278,7 +330,14 @@ Item {
         interval: 1000
         repeat: true
         running: true
-        onTriggered: console.info("PROBE tick " + root.state())
+        onTriggered: {
+            console.info("PROBE tick " + root.state());
+            if (!root.expiredOne && plain.rowCount() >= 3) {
+                root.expiredOne = true;
+                popups.expire(popups.index(0, 0));
+                console.info("PROBE expired the newest popup");
+            }
+        }
     }
 
     Component.onCompleted: {
@@ -302,10 +361,10 @@ sleep 3
 echo "PROBE-SH urgency: $(call Notify 'Star test' 0 dialog-information 'With urgency' 'Normal urgency' '[]' "{'urgency': <byte 1>}" 30000)"
 sleep 3
 echo "PROBE-SH desktop-entry: $(call Notify 'Konsole' 0 utilities-terminal 'With a desktop entry' 'Konsole' '[]' "{'desktop-entry': <'org.kde.konsole'>}" 30000)"
-sleep 4
+sleep 6
 kill "$pid"
 wait "$pid" 2>/dev/null
-grep -v -E 'QStandardPaths|propagateSizeHints' /tmp/notify-probe.log | head -n 120
+grep -v -E 'QStandardPaths|propagateSizeHints' /tmp/notify-probe.log | head -n 160
 EOF
 chmod 0755 /tmp/notify-probe.sh
 if [[ -n $qml_tool ]]; then

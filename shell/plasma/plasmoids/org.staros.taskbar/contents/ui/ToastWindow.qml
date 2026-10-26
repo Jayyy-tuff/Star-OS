@@ -6,7 +6,8 @@ import StarOS.Shell
 
 // New notifications at the top right: a layer-shell window as large as the
 // toasts plus a transparent margin, above windows, that never takes the
-// keyboard.
+// keyboard. Like the shell overlay it has no transient parent: tied to the
+// panel's window, it would not become a layer surface of its own.
 Window {
     id: win
 
@@ -20,6 +21,7 @@ Window {
     signal actionRequested(int row, string actionName)
 
     visible: toasts.count > 0
+    transientParent: null
     width: toasts.implicitWidth + win.margin
     height: Math.max(1, toasts.implicitHeight + win.margin)
     title: qsTr("Notifications")
