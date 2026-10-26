@@ -83,6 +83,21 @@ Item {
         anchorRight: 1100
     }
 
+    // Short enough that the panel's top stays inside grabImage()'s crop at
+    // 200 %.
+    Component {
+        id: shortComponent
+
+        QuickSettings {
+            width: 640
+            height: 360
+            audio: fakeAudio
+            display: fakeDisplay
+            network: fakeNetwork
+            anchorRight: Theme.trayPanelWidth + Theme.spacing
+        }
+    }
+
     Component {
         id: bareComponent
 
@@ -187,7 +202,6 @@ Item {
             quick.gameModeAvailable = false;
             quick.gameMode = false;
             quick.clipboardCount = -1;
-            quick.anchorRight = 1100;
             for (const spy of [closeSpy, dndSpy, gameSpy, clipboardSpy, lensSpy, storageSpy, settingsSpy, powerSpy]) {
                 spy.clear();
             }
@@ -474,17 +488,20 @@ Item {
         }
 
         // grabImage() returns device pixels without a pixel ratio, cropped to
-        // the item's logical size, so the panel moves to the left where the
-        // sample point stays inside that crop at every scale.
+        // the item's logical size; a short instance keeps the network tile
+        // inside that crop at every scale.
         function test_focus_ring() {
-            quick.anchorRight = Theme.trayPanelWidth + Theme.spacing;
-            waitForRendering(quick);
-            const img = grabImage(quick);
+            const small = createTemporaryObject(shortComponent, root);
+            small.reset();
+            const tile = findChild(small, "networkTile");
+            tryVerify(() => tile.activeFocus, 2000, "the network tile has focus");
+            waitForRendering(small);
+            const img = grabImage(small);
             const dpr = Screen.devicePixelRatio;
-            const p = networkTile.mapToItem(quick, 0, networkTile.height / 2);
+            const p = tile.mapToItem(small, 0, tile.height / 2);
             const y = Math.floor(p.y * dpr);
             verify(Math.floor((p.x + 6) * dpr) < img.width && y < img.height,
-                   "sample point inside the grabbed image " + img.width + "x" + img.height);
+                   "sample point " + p.x + "," + p.y + " inside the grabbed image " + img.width + "x" + img.height);
             let hits = 0;
             for (let x = Math.max(0, Math.floor(p.x * dpr) - 2); x < Math.floor((p.x + 6) * dpr); ++x) {
                 if (Math.abs(img.red(x, y) - Theme.focusRing.r * 255) <= 8
