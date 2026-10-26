@@ -52,6 +52,11 @@ which ADR-0008 rules out.
   the last one again when its owner disappears; Meta+V opens the history.
   Copies marked secret by password managers are skipped. The image adds
   `wl-clipboard` (GPL-3.0) for the command line and the session test.
+  KSystemClipboard (kguiaddons 6.31) reads data-control events on its own
+  thread and returns plasmashell's own copy made through Qt's clipboard
+  while Qt still believes it owns it, which Qt learns on another queue;
+  the history therefore reads each change again once settled and never
+  lets such a read move an older copy to the top (CI runs 39 and 40).
 
 ## Consequences and trade-offs
 

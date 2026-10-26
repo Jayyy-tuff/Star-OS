@@ -21,9 +21,14 @@ class QMimeData;
 //
 // KSystemClipboard reads the Wayland clipboard through the data-control
 // protocol inside plasmashell, and QClipboard elsewhere (the tests). Each
-// change is read at once and again once it has settled (SettleMs): on
-// Wayland a change can arrive before Qt learns that another app replaced
-// this process's own copy, and the first read then still sees the old one.
+// change is read at once and again once it has settled (SettleMs).
+//
+// On Wayland, KSystemClipboard hands out this process's own copy made
+// through Qt's clipboard (a shell text field's Ctrl+C, the start menu's
+// answers) while Qt believes it owns the clipboard, and Qt learns that
+// another app replaced it on a different event queue than the change.
+// Such reads may be stale: they add a copy that is new but never move an
+// older one to the top, and are read again (up to OwnCopyRereads times).
 // An emptied clipboard is refilled only after the change has settled.
 class ClipboardHistory : public QAbstractListModel
 {
@@ -50,6 +55,7 @@ public:
     static constexpr int PreviewLength = 300;
     static constexpr int ThumbnailSize = 240;
     static constexpr int SettleMs = 150;
+    static constexpr int OwnCopyRereads = 3;
 
     explicit ClipboardHistory(QObject *parent = nullptr);
     ~ClipboardHistory() override;
@@ -84,8 +90,12 @@ private:
 
     void onChanged();
     void readClipboard(bool settled);
-    // Returns whether the copy was new.
-    bool add(Item item);
+    // Whether reads now return this process's copy made through Qt's
+    // clipboard rather than the system clipboard's current one.
+    bool readsOwnQtCopy() const;
+    // Returns whether the copy was new. With moveExisting false, a copy
+    // already kept stays where it is.
+    bool add(Item item, bool moveExisting = true);
     void restore();
     QMimeData *mimeFor(const Item &item) const;
     int indexOf(const QByteArray &hash, bool image) const;
@@ -96,4 +106,5 @@ private:
     bool m_keysEnabled = false;
     QDateTime m_lastRestore;
     QTimer m_settle;
+    int m_rereads = 0;
 };

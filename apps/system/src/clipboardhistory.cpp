@@ -5,6 +5,7 @@
 #include <QBuffer>
 #include <QClipboard>
 #include <QCryptographicHash>
+#include <QGuiApplication>
 #include <QKeySequence>
 #include <QLoggingCategory>
 #include <QMimeData>
@@ -139,13 +140,26 @@ void ClipboardHistory::setKeysEnabled(bool enabled)
 
 void ClipboardHistory::onChanged()
 {
+    m_rereads = 0;
     readClipboard(false);
     m_settle.start();
+}
+
+bool ClipboardHistory::readsOwnQtCopy() const
+{
+    // Off Wayland KSystemClipboard is Qt's clipboard itself: never true.
+    const QClipboard *qt = QGuiApplication::clipboard();
+    return qt && qt->ownsClipboard() && !m_clipboard->ownsClipboard();
 }
 
 void ClipboardHistory::readClipboard(bool settled)
 {
     const char *when = settled ? "settled" : "change";
+    const bool ownQtCopy = readsOwnQtCopy();
+    if (ownQtCopy && settled && m_rereads < OwnCopyRereads) {
+        ++m_rereads;
+        m_settle.start();
+    }
     const QMimeData *mime = m_clipboard->mimeData(QClipboard::Clipboard);
     if (!mime || mime->formats().isEmpty()) {
         qCInfo(lcClipboard, "STAROS-CLIPBOARD %s empty", when);
@@ -182,9 +196,9 @@ void ClipboardHistory::readClipboard(bool settled)
         return;
     }
     const bool image = item.image;
-    const bool added = add(std::move(item));
-    qCInfo(lcClipboard, "STAROS-CLIPBOARD %s %s %s count=%d", when, image ? "image" : "text", added ? "added" : "known",
-           rowCount());
+    const bool added = add(std::move(item), !ownQtCopy);
+    qCInfo(lcClipboard, "STAROS-CLIPBOARD %s %s %s%s count=%d", when, image ? "image" : "text", added ? "added" : "known",
+           ownQtCopy ? " own-qt-copy" : "", rowCount());
 }
 
 int ClipboardHistory::indexOf(const QByteArray &hash, bool image) const
@@ -197,10 +211,10 @@ int ClipboardHistory::indexOf(const QByteArray &hash, bool image) const
     return -1;
 }
 
-bool ClipboardHistory::add(Item item)
+bool ClipboardHistory::add(Item item, bool moveExisting)
 {
     const int existing = indexOf(item.hash, item.image);
-    if (existing == 0) {
+    if (existing == 0 || (existing > 0 && !moveExisting)) {
         return false;
     }
     if (existing > 0) {
