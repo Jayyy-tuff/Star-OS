@@ -207,8 +207,8 @@ void DesktopServicesTest::removeAndClear()
     history.clear();
     QCOMPARE(history.rowCount(), 0);
     QCOMPARE(clipboard()->text(), QString());
-    // Nothing comes back after Clear.
-    QTest::qWait(50);
+    // Nothing comes back after Clear, also once the change has settled.
+    QTest::qWait(ClipboardHistory::SettleMs + 100);
     QCOMPARE(clipboard()->text(), QString());
     QCOMPARE(history.rowCount(), 0);
 }

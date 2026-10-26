@@ -6,10 +6,14 @@
 #include <QClipboard>
 #include <QCryptographicHash>
 #include <QKeySequence>
+#include <QLoggingCategory>
 #include <QMimeData>
 
 #include <KGlobalAccel>
 #include <KSystemClipboard>
+
+// What each change did (never what was copied), for the session test.
+Q_LOGGING_CATEGORY(lcClipboard, "staros.clipboard", QtInfoMsg)
 
 namespace
 {
@@ -46,6 +50,12 @@ ClipboardHistory::ClipboardHistory(QObject *parent)
     : QAbstractListModel(parent)
     , m_clipboard(KSystemClipboard::instance())
 {
+    m_settle.setSingleShot(true);
+    m_settle.setInterval(SettleMs);
+    connect(&m_settle, &QTimer::timeout, this, [this] {
+        readClipboard(true);
+    });
+    qCInfo(lcClipboard, "STAROS-CLIPBOARD backend=%s", m_clipboard ? m_clipboard->metaObject()->className() : "none");
     if (m_clipboard) {
         connect(m_clipboard, &KSystemClipboard::changed, this, [this](QClipboard::Mode mode) {
             if (mode == QClipboard::Clipboard) {
@@ -129,14 +139,25 @@ void ClipboardHistory::setKeysEnabled(bool enabled)
 
 void ClipboardHistory::onChanged()
 {
+    readClipboard(false);
+    m_settle.start();
+}
+
+void ClipboardHistory::readClipboard(bool settled)
+{
+    const char *when = settled ? "settled" : "change";
     const QMimeData *mime = m_clipboard->mimeData(QClipboard::Clipboard);
     if (!mime || mime->formats().isEmpty()) {
+        qCInfo(lcClipboard, "STAROS-CLIPBOARD %s empty", when);
         // The app that owned the copy went away (or cleared it): offer the
-        // newest copy again, after this change has been delivered.
-        QMetaObject::invokeMethod(this, &ClipboardHistory::restore, Qt::QueuedConnection);
+        // newest copy again.
+        if (settled) {
+            restore();
+        }
         return;
     }
     if (mime->data(SecretHint) == "secret") {
+        qCInfo(lcClipboard, "STAROS-CLIPBOARD %s secret", when);
         return;
     }
     Item item;
@@ -144,20 +165,26 @@ void ClipboardHistory::onChanged()
     if (mime->hasText()) {
         item.text = mime->text();
         if (item.text.isEmpty() || item.text.size() > MaxTextLength) {
+            qCInfo(lcClipboard, "STAROS-CLIPBOARD %s text-skipped length=%lld", when, qlonglong(item.text.size()));
             return;
         }
         item.hash = hashText(item.text);
     } else if (mime->hasImage()) {
         item.picture = qvariant_cast<QImage>(mime->imageData());
         if (item.picture.isNull()) {
+            qCInfo(lcClipboard, "STAROS-CLIPBOARD %s image-unreadable", when);
             return;
         }
         item.image = true;
         item.hash = hashImage(item.picture);
     } else {
+        qCInfo(lcClipboard, "STAROS-CLIPBOARD %s other formats=%lld", when, qlonglong(mime->formats().size()));
         return;
     }
-    add(std::move(item));
+    const bool image = item.image;
+    const bool added = add(std::move(item));
+    qCInfo(lcClipboard, "STAROS-CLIPBOARD %s %s %s count=%d", when, image ? "image" : "text", added ? "added" : "known",
+           rowCount());
 }
 
 int ClipboardHistory::indexOf(const QByteArray &hash, bool image) const
@@ -170,17 +197,17 @@ int ClipboardHistory::indexOf(const QByteArray &hash, bool image) const
     return -1;
 }
 
-void ClipboardHistory::add(Item item)
+bool ClipboardHistory::add(Item item)
 {
     const int existing = indexOf(item.hash, item.image);
     if (existing == 0) {
-        return;
+        return false;
     }
     if (existing > 0) {
         beginMoveRows(QModelIndex(), existing, existing, QModelIndex(), 0);
         m_items.move(existing, 0);
         endMoveRows();
-        return;
+        return false;
     }
     if (item.image) {
         item.thumbnail = thumbnailFor(item.picture);
@@ -202,6 +229,7 @@ void ClipboardHistory::add(Item item)
         ++row;
     }
     Q_EMIT countChanged();
+    return true;
 }
 
 QMimeData *ClipboardHistory::mimeFor(const Item &item) const
@@ -230,6 +258,7 @@ void ClipboardHistory::restore()
         return;
     }
     m_lastRestore = now;
+    qCInfo(lcClipboard, "STAROS-CLIPBOARD restore %s", m_items.first().image ? "image" : "text");
     m_clipboard->setMimeData(mimeFor(m_items.first()), QClipboard::Clipboard);
 }
 

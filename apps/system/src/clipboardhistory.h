@@ -8,6 +8,7 @@
 #include <QPointer>
 #include <QQmlEngine>
 #include <QString>
+#include <QTimer>
 
 class KSystemClipboard;
 class QAction;
@@ -19,7 +20,11 @@ class QMimeData;
 // Copies an app marks as secret (x-kde-passwordManagerHint) are not kept.
 //
 // KSystemClipboard reads the Wayland clipboard through the data-control
-// protocol inside plasmashell, and QClipboard elsewhere (the tests).
+// protocol inside plasmashell, and QClipboard elsewhere (the tests). Each
+// change is read at once and again once it has settled (SettleMs): on
+// Wayland a change can arrive before Qt learns that another app replaced
+// this process's own copy, and the first read then still sees the old one.
+// An emptied clipboard is refilled only after the change has settled.
 class ClipboardHistory : public QAbstractListModel
 {
     Q_OBJECT
@@ -44,6 +49,7 @@ public:
     static constexpr int MaxTextLength = 1000000;
     static constexpr int PreviewLength = 300;
     static constexpr int ThumbnailSize = 240;
+    static constexpr int SettleMs = 150;
 
     explicit ClipboardHistory(QObject *parent = nullptr);
     ~ClipboardHistory() override;
@@ -77,7 +83,9 @@ private:
     };
 
     void onChanged();
-    void add(Item item);
+    void readClipboard(bool settled);
+    // Returns whether the copy was new.
+    bool add(Item item);
     void restore();
     QMimeData *mimeFor(const Item &item) const;
     int indexOf(const QByteArray &hash, bool image) const;
@@ -87,4 +95,5 @@ private:
     QPointer<QAction> m_action;
     bool m_keysEnabled = false;
     QDateTime m_lastRestore;
+    QTimer m_settle;
 };

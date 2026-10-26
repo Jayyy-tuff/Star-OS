@@ -985,6 +985,9 @@ def scenario_clipboard(s):
         code, out = paste(s)
         if code == 0 and out == first:
             break
+    _, log, _ = s.guest(["/usr/bin/sh", "-c", "journalctl -b _UID=1000 -o cat --no-pager -q"
+                         " | grep STAROS-CLIPBOARD | tail -n 12"])
+    s.record("S21", "INFO", "clipboard history log: " + " | ".join(log.strip().splitlines()))
     s.check("S21", code == 0 and out == first, f"after wl-copy exited, wl-paste still reads it: {out!r}")
     wl_copy(s, second)
     time.sleep(2)
