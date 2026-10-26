@@ -372,3 +372,20 @@ if [[ -n $qml_tool ]]; then
         dbus-run-session /tmp/notify-probe.sh "$qml_tool" 2>&1 | sed 's/^/    /'
     fact notify.probe_exit "${PIPESTATUS[0]}"
 fi
+
+section "M0.5: KSystemClipboard on Wayland (kguiaddons source, for the clipboard history)"
+kga_version=$(pacman -Si kguiaddons 2>/dev/null | awk -F': ' '/^Version/{print $2}' | head -n1)
+kga_upstream=${kga_version%-*}
+kga_series=${kga_upstream%.*}
+fact kguiaddons.version "$kga_version"
+kga_url="https://download.kde.org/stable/frameworks/$kga_series/kguiaddons-$kga_upstream.tar.xz"
+fact kguiaddons.url "$kga_url"
+if curl -fsSL --retry 3 -o /tmp/kguiaddons.tar.xz "$kga_url"; then
+    mkdir -p /tmp/kguiaddons && tar -xJf /tmp/kguiaddons.tar.xz -C /tmp/kguiaddons --strip-components=1
+    for f in /tmp/kguiaddons/src/systemclipboard/*.cpp; do
+        printf -- '---- %s\n' "${f#/tmp/kguiaddons/}"
+        sed 's/^/    | /' "$f"
+    done
+else
+    fact kguiaddons.download FAILED
+fi
