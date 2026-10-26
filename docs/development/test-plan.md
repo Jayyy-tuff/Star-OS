@@ -125,6 +125,47 @@ recorded in `docs/development/phase-0-plan.md` from CI runs only.
 | T0-47 | Game Center and Welcome | E-CI, E-VMW | Unit: Steam KeyValues files, library folders and manifests (tools and partial installs left out), games from desktop entries, filters, search, launches and game mode with a recorder; the views with fakes; the tour's pages, buttons, Skip and Escape. Session: S23 Welcome opens at login and Escape skips it for good; S24 Game Center opens with "No games yet"; storage test B3 Welcome stays shut once skipped. Owner: Steam games and GameMode on real hardware | **yes** (`packages`, `session-test` S23, S24, `storage-test` B3) |
 | T0-48 | Star OS look, lock and logout screens | E-CI, E-VMW | Image: the look-and-feel package, `StarOS.colors`, `kdeglobals` naming them, no `lock_screen=false`, `Autolock=false`. Session: S25 locking shows the Star OS lock screen ("Password", "Unlock") and Return unlocks the live user; S26 the logout prompt shows the Star OS logout screen (Restart, Shut down, Log out, Cancel) and Escape cancels it. Owner: Meta+L, the start menu's power choices, and KDE apps in the deep space colours | **yes** (`build` policy, `session-test` S25, S26) |
 
+## Manual procedure: VMware Workstation, M0.5 (T0-41..T0-48)
+
+Use the ISO of a green CI run and record its link. Give the VM network (NAT),
+4 GB RAM, UEFI firmware and a sound card; try once with **Accelerate 3D
+graphics** on and once off. Nothing here writes to a disk.
+
+1. Welcome (T0-47): after login the Welcome tour is open. Take the tour with
+   Return and the arrow keys; Escape skips it. Restart the session (log out
+   and in): it does not open again. Open it from Applications: it does.
+2. Taskbar and start menu (T0-42): a floating glass taskbar with the Star
+   button, pinned apps, open windows, tray, clock and bell. Meta opens the
+   start menu with the search field focused; pinned apps, All apps, typing
+   `firefox` and Return starts Firefox. Every control shows the amber focus
+   ring with Tab.
+3. Install an app (T0-41): in Sun Store enable Flathub and install a small
+   app (for example a calculator). Without restarting anything it appears in
+   the start menu under "Recently installed", marked new, and starts.
+4. Quick settings (T0-43): click the tray. The network tile says "Wired,
+   connected"; the volume slider changes the sound (play a video in VLC);
+   Night light tints the screen; Do not disturb holds notifications back.
+   Note anything that has no effect.
+5. Notifications and calendar (T0-44): from Konsole run
+   `notify-send --hint=string:desktop-entry:org.kde.konsole Hello "From Konsole"`:
+   a toast appears at the top right and goes after a few seconds. Click the
+   clock: the month with today marked and the notification listed. (Without
+   the hint, KDE's default settings keep notifications from unnamed senders
+   out of the list, ADR-0014.) Clear all.
+6. Clipboard (T0-45): copy text in KWrite, then copy other text in Firefox;
+   close KWrite. Meta+V lists both, newest first; choose the older one and
+   paste it in Firefox.
+7. Desktop widgets (T0-46): Clock, Weather, System and Calendar on the
+   desktop. Search a city in Weather: the forecast appears (network needed).
+   Hide a widget from the Widgets menu and show it again.
+8. Game Center (T0-47): it opens with "No games yet" and Game mode; "Get
+   games" opens Sun Store on Games. If Steam is installed from Sun Store,
+   its games appear (Steam needs network and an account; optional).
+9. Lock and logout screens (T0-48): Meta+L shows the Star OS lock screen
+   (time, date, user, password field); Return unlocks the live user. Start
+   menu > Power shows the Star OS logout screen; Cancel closes it; Restart
+   restarts. KDE apps (Konsole, System Settings) use the deep space colours.
+
 ## Manual procedure: VMware Workstation, M0.4 (T0-35..T0-40)
 
 Use the ISO of a green CI run and record its link. Give the VM network (NAT),
