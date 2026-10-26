@@ -32,6 +32,25 @@ Light colours, and the UI font is Noto Sans.
   Return unlocks; the session test locks and unlocks.
 - If the Star OS lock screen QML fails, kscreenlocker's built-in fallback
   takes over (its behaviour), so a broken theme cannot lock the person out.
+  That fallback asks for `loginctl unlock-session` from another console;
+  the session test uses it only to recover, and fails the step.
+
+### Amendment (2026-10-26, implementation)
+
+- The live user's `kdeglobals` with `action/lock_screen=false` is removed;
+  `kscreenlockerrc` keeps `Autolock=false` and `LockOnResume=false`
+  (`check-image-policy.sh` checks both).
+- `/etc/xdg/kdeglobals` carries the colour groups of
+  `/usr/share/color-schemes/StarOS.colors` and `breeze-dark` icons, because
+  KDE apps read colours from `kdeglobals`, not from the scheme file.
+- The lock screen checks which authenticator methods kscreenlocker offers
+  (`startAuthenticating`/`respond`, or `tryUnlock`) instead of assuming
+  one, and logs what it found (`STAROS-LOCK ready … api=`). Without a
+  password PAM can accept before anything is typed; as in Breeze, the screen
+  then waits for Return.
+- `logout/Logout.qml` is not shipped yet: the logout greeter's QML API is
+  being confirmed from the pinned Plasma packages (`inspect-kde.sh`), and the
+  package falls back to Breeze's logout screen until then.
 
 ## Consequences and trade-offs
 

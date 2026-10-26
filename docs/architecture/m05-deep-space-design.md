@@ -165,13 +165,16 @@ run.
 ## 8. Lock screen and session look (ADR-0016)
 
 - A Star OS look-and-feel package `org.staros.lookandfeel` with
-  `lockscreen/LockScreen.qml` (clock, date, blurred wallpaper, the user,
-  password field; Return with an empty field unlocks the passwordless live
-  user through PAM's `nullok`) and `logout/Logout.qml` (Log out, Restart,
-  Shut down, Cancel). `kdeglobals` names it. On the live medium the screen
-  never locks by itself (`Autolock=false`), but Lock and Meta+L work.
-- `StarOS` colour scheme (`/usr/share/color-schemes/StarOS.colors`) is the
-  default for KDE apps and window title bars; the accent matches the shell.
+  `lockscreen/LockScreen.qml`: the wallpaper dimmed, the time and date, the
+  user's picture or initial and name, a "Password" field and "Unlock"; Return
+  with an empty field unlocks the passwordless live user through PAM's
+  `nullok`. `kdeglobals` names the package. On the live medium the screen
+  never locks by itself (`Autolock=false`), but Lock and Meta+L work. The
+  logout screen stays Breeze's until its API is confirmed (ADR-0016
+  amendment).
+- `StarOS` colour scheme (`/usr/share/color-schemes/StarOS.colors`, its
+  groups also in `/etc/xdg/kdeglobals`) is the default for KDE apps and
+  window title bars, with `breeze-dark` icons; the accent matches the shell.
 
 ## 9. Game Center and Welcome (ADR-0017)
 
@@ -182,10 +185,15 @@ run.
   desktop entry or `steam://rungameid/<id>`. "Game mode" starts games through
   Feral GameMode (`gamemoderun`, package `gamemode`) and turns on Do not
   disturb while a game runs.
-- `apps/welcome` (`staros-welcome`, "Welcome to Star OS"): five pages (Star OS,
-  Star Lens, Star Storage, Sun Store and Game Center, quick answers and
-  keyboard), opened once per user by an autostart entry that it disables when
-  finished or skipped; in Applications afterwards.
+- `apps/welcome` (`staros-welcome`, "Welcome to Star OS"): five pages (Star OS;
+  the Star key, quick answers and notes; Star Lens; Star Storage; Sun Store
+  and Game Center), opened at login by `/etc/xdg/autostart` with
+  `--autostart`, which does nothing once the tour was finished or skipped
+  (`~/.config/staros-welcomerc`); in Applications afterwards.
+- Game Center's "game mode" applies to games started from their desktop
+  entries outside Flatpak (through `gamemoderun`); Steam and Flatpak games
+  turn GameMode on themselves. While such a game runs, Game Center holds
+  notifications back (`org.freedesktop.Notifications.Inhibit`).
 
 ## 10. Accessibility and keyboard
 
