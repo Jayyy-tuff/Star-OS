@@ -44,7 +44,7 @@ Scenarios:
   S24 Game Center opens from the start menu with its search, filters, game
       mode and "Get games"; no games are installed, so it says so
   S25 locking shows the Star OS lock screen (kscreenlocker loads it from
-      the org.staros.shell package): the time, a "Password" field and "Unlock";
+      the org.staros.shell package): the time, a password field and "Unlock";
       Return unlocks the passwordless live user (ADR-0016)
   S26 Power shows the Star OS logout screen ("What would you like to do?",
       Restart, Shut down, Log out, Cancel); Escape cancels it (ADR-0016)
@@ -922,8 +922,12 @@ def scenario_lock_screen(s):
         # Leave the session usable before failing.
         s.as_user(["/usr/bin/loginctl", "unlock-session"], timeout=30)
     s.check("S25", loaded, "the Star OS lock screen loaded (not the fallback)")
-    s.check("S25", bool(find(tree, name="Password", showing=True)) and bool(find(tree, name="Unlock", showing=True)),
-            "the lock screen shows 'Password' and 'Unlock'")
+    # Qt reports a password field with the role "password text".
+    fields = [n for n in find(tree, showing=True) if n.get("role") == "password text" or n.get("name") == "Password"]
+    nodes = [(n.get("role"), n.get("name"), n.get("states")) for n in find(tree)]
+    s.record("S25", "INFO", f"lock screen nodes: {json.dumps(nodes[:30])[:1500]}")
+    s.check("S25", bool(fields) and bool(find(tree, name="Unlock", showing=True)),
+            f"the lock screen shows a password field and 'Unlock': {json.dumps(fields[:1])}")
     s.screenshot("S25-lock-screen")
     s.keys("ret")
     unlocked = wait_locked(s, False, 30)
