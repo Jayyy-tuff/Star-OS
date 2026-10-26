@@ -253,6 +253,21 @@ assemble_profile() {
     retitle_boot_entries "$profile"
 }
 
+# Downloads the image's packages into the host's package cache, with
+# retries: mkarchiso's pacstrap reads that cache (-c) but stops at the first
+# stalled download. An empty package database makes pacman fetch every
+# dependency, not only those the host lacks.
+prefetch_packages() {
+    local profile=$1 db="$build_dir/prefetch-db"
+    local -a packages
+    mapfile -t packages < <(grep -v -E '^[[:space:]]*(#|$)' "$profile/packages.x86_64")
+    rm -rf -- "$db"
+    mkdir -p -- "$db"
+    log "Downloading ${#packages[@]} listed packages and their dependencies into the package cache"
+    staros_pacman --config "$profile/pacman.conf" --dbpath "$db" -Syw --noconfirm -- "${packages[@]}"
+    rm -rf -- "$db"
+}
+
 write_records() {
     local work=$1 baseline=$2 iso commit
     local -a isos=("$out_dir"/*.iso)
@@ -291,6 +306,8 @@ main() {
 
     log "Assembling profile: $releng_dir (archiso $(staros_archiso_version)) + $overlay_dir"
     assemble_profile "$profile"
+
+    prefetch_packages "$profile"
 
     rm -rf -- "$work" "$out_dir"
     mkdir -p -- "$out_dir"

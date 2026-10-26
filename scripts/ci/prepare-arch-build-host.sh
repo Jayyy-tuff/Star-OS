@@ -28,5 +28,5 @@ sed -i -E '/^[[:space:]]*NoExtract[[:space:]]*=/d' /etc/pacman.conf
 
 pacman-key --init
 pacman-key --populate archlinux
-pacman -Syyuu --noconfirm --needed archiso grub "$@"
+staros_pacman -Syyuu --noconfirm --needed archiso grub "$@"
 pacman -Q archiso grub "$@"

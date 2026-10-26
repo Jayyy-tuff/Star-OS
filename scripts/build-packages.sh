@@ -78,7 +78,7 @@ install_dependencies() {
     done
     if ((${#repo_deps[@]} > 0)); then
         log "Installing ${#repo_deps[@]} dependencies: ${repo_deps[*]}"
-        pacman -S --noconfirm --needed --asdeps -- "${repo_deps[@]}"
+        staros_pacman -S --noconfirm --needed --asdeps -- "${repo_deps[@]}"
     fi
     if ((${#local_files[@]} > 0)); then
         log "Installing Star OS packages built earlier: ${local_files[*]##*/}"
