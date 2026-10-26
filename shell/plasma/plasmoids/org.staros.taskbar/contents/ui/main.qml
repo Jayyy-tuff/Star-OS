@@ -86,6 +86,11 @@ ContainmentItem {
         onCountChanged: console.info("STAROS-SHELL clipboard=" + count)
     }
 
+    // Game Center's game mode, also a quick settings tile (ADR-0017).
+    GameModeSetting {
+        id: gameModeSetting
+    }
+
     NetworkStatus {
         id: network
         onChanged: console.info("STAROS-SHELL network=" + state + " kind=" + kind)
@@ -200,6 +205,7 @@ ContainmentItem {
         network: network
         notifications: history
         clipboard: clipboard
+        gameMode: gameModeSetting
         pinnedIds: root.menuPins
         iconFallback: themeIcon
         doNotDisturb: root.doNotDisturb

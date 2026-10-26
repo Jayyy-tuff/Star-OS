@@ -35,7 +35,9 @@ GameLibrary::GameLibrary(QObject *parent)
     : QAbstractListModel(parent)
     , m_steamRoots(SteamLibrary::defaultRoots(QDir::homePath()))
     , m_gameModeAvailable(!QStandardPaths::findExecutable(QStringLiteral("gamemoderun")).isEmpty())
-    , m_configPath(QStandardPaths::writableLocation(QStandardPaths::GenericConfigLocation) + QStringLiteral("/staros-gamesrc"))
+    // A name, not a path: KConfig finds it in ~/.config, and quick settings
+    // (StarOS.System's GameModeSetting) is told when it changes.
+    , m_configPath(QStringLiteral("staros-gamesrc"))
 {
     m_launcher = [this](const QString &kind, const QString &target, bool gameMode) {
         return defaultLaunch(kind, target, gameMode);
@@ -149,7 +151,7 @@ void GameLibrary::setGameMode(bool on)
     }
     m_gameMode = on;
     KConfig config(m_configPath, KConfig::SimpleConfig);
-    config.group(QStringLiteral("General")).writeEntry("GameMode", on);
+    config.group(QStringLiteral("General")).writeEntry("GameMode", on, KConfig::Notify);
     config.sync();
     Q_EMIT gameModeChanged();
 }
@@ -314,6 +316,13 @@ bool GameLibrary::launchGame(const QString &gameId)
     });
     if (it == m_all.end()) {
         return false;
+    }
+    // Quick settings may have changed game mode since Game Center opened.
+    const bool gameModeBefore = m_gameMode;
+    KConfig settings(m_configPath, KConfig::SimpleConfig);
+    m_gameMode = settings.group(QStringLiteral("General")).readEntry("GameMode", m_gameMode);
+    if (m_gameMode != gameModeBefore) {
+        Q_EMIT gameModeChanged();
     }
     const bool steam = gameId.startsWith(QLatin1String("steam:"));
     const bool started = steam ? m_launcher(QStringLiteral("url"), QStringLiteral("steam://rungameid/") + gameId.mid(6), false)

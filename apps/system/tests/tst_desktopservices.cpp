@@ -6,6 +6,7 @@
 // saved, shared and reloaded, and bad files are tolerated.
 
 #include "clipboardhistory.h"
+#include "gamemodesetting.h"
 #include "widgetstore.h"
 
 #include <QClipboard>
@@ -42,6 +43,7 @@ private Q_SLOTS:
     void storeSavesAndShares();
     void storeReloadsExternalChanges();
     void storeToleratesBadFiles();
+    void gameModeSetting();
 
 private:
     static QString text(const ClipboardHistory &history, int row);
@@ -273,6 +275,27 @@ void DesktopServicesTest::storeToleratesBadFiles()
     file.close();
     store.reload();
     QCOMPARE(store.values(), QVariantMap());
+}
+
+void DesktopServicesTest::gameModeSetting()
+{
+    const QString path = QStandardPaths::writableLocation(QStandardPaths::GenericConfigLocation) + u"/staros-gamesrc"_s;
+    QFile::remove(path);
+    GameModeSetting setting;
+    QVERIFY(!setting.enabled());
+    QCOMPARE(setting.available(), !QStandardPaths::findExecutable(u"gamemoderun"_s).isEmpty());
+    QSignalSpy changed(&setting, &GameModeSetting::enabledChanged);
+    setting.setEnabled(true);
+    QVERIFY(setting.enabled());
+    QCOMPARE(changed.count(), 1);
+    setting.setEnabled(true);
+    QCOMPARE(changed.count(), 1);
+    QFile file(path);
+    QVERIFY(file.open(QIODevice::ReadOnly));
+    QVERIFY(file.readAll().contains("GameMode=true"));
+    // What Game Center would read.
+    GameModeSetting other;
+    QVERIFY(other.enabled());
 }
 
 QTEST_MAIN(DesktopServicesTest)

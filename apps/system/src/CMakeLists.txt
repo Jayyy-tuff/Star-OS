@@ -12,6 +12,7 @@ qt_add_qml_module(staros_system
         audiocontrol.cpp audiocontrol.h
         clipboardhistory.cpp clipboardhistory.h
         displaycontrol.cpp displaycontrol.h
+        gamemodesetting.cpp gamemodesetting.h
         networkstatus.cpp networkstatus.h
         notesstore.cpp notesstore.h
         systemstatus.cpp systemstatus.h

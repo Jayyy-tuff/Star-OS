@@ -21,6 +21,7 @@ Window {
     property var network: null
     property var notifications: null
     property var clipboard: null
+    property var gameMode: null
     property var pinnedIds: []
     property Component iconFallback: null
     property bool doNotDisturb: false
@@ -187,6 +188,9 @@ Window {
         status: win.systemStatus
         doNotDisturb: win.doNotDisturb
         clipboardCount: win.clipboard ? win.clipboard.count : -1
+        gameModeAvailable: win.gameMode !== null && win.gameMode.available
+        gameMode: win.gameMode !== null && win.gameMode.enabled
+        onGameModeToggled: win.gameMode.enabled = !win.gameMode.enabled
         anchorRight: win.anchorRight
         onCloseRequested: win.hidePanel()
         onDoNotDisturbToggled: win.doNotDisturbToggled()

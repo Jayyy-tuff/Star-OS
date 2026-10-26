@@ -8,6 +8,7 @@ foreach(test_name tst_systemstatus tst_notesstore tst_applicationsmodel tst_cont
         ${PROJECT_SOURCE_DIR}/src/audiocontrol.cpp
         ${PROJECT_SOURCE_DIR}/src/clipboardhistory.cpp
         ${PROJECT_SOURCE_DIR}/src/displaycontrol.cpp
+        ${PROJECT_SOURCE_DIR}/src/gamemodesetting.cpp
         ${PROJECT_SOURCE_DIR}/src/networkstatus.cpp
         ${PROJECT_SOURCE_DIR}/src/systemstatus.cpp
         ${PROJECT_SOURCE_DIR}/src/notesstore.cpp
