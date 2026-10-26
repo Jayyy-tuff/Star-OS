@@ -369,6 +369,39 @@ Storage (the storage test uses UEFI).
 Still to do: the owner's VMware run (`test-plan.md`, M0.4 procedure) and
 the owner's review of the live polkit rule (ADR-0011).
 
+## M0.5 — Deep Space desktop (in progress)
+
+Requested by the owner on 2026-10-25: "make the UI look realistic … modern,
+aesthetic, and admirable", installed apps must appear in Applications, and
+"ask me what else to add". Owner decisions the same day: a floating taskbar,
+the deep space dark mood, quick settings and tray, clock, calendar and
+notifications, clipboard history, desktop widgets, Game Center, a Welcome
+tour and a matching lock screen. The design contract is
+`docs/architecture/m05-deep-space-design.md` (with ADR-0013..ADR-0017); the
+tests are T0-41..T0-48 in `test-plan.md`.
+
+What exists in the repository:
+
+- `StarOS.Shell`: deep space tokens (Inter, glass, accent gradient), a
+  floating glass taskbar with the start button, apps and windows, tray,
+  clock and bell; a start menu (pinned, all apps, recently installed,
+  search with quick answers and notes, power menu); quick settings (network
+  and Wi-Fi, volume, brightness, night light, Do not disturb, game mode,
+  clipboard, Star Lens); toasts and a notification centre over a month
+  calendar; the clipboard history panel (Meta+V); desktop widgets (Clock,
+  Weather, System, Calendar).
+- `StarOS.System` (`staros-system` 0.5.0): `ApplicationsModel` (every
+  installed app, followed live), `AudioControl`, `DisplayControl`,
+  `NetworkStatus` (networkd, iwd), `ClipboardHistory`, `WidgetStore`,
+  `GameModeSetting`, and processor use in `SystemStatus`.
+- The taskbar adapter is the notification server (libnotificationmanager)
+  and hosts every panel in one layer-shell overlay.
+- `apps/games` (`staros-games`, Game Center) and `apps/welcome`
+  (`staros-welcome`, Welcome to Star OS); `gamemode`, `wl-clipboard` and
+  `inter-font` in the image.
+- `org.staros.lookandfeel` with the Star OS lock screen, the `StarOS` colour
+  scheme and dark icons for KDE apps; manual locking on the live medium.
+
 ## Supported hardware assumptions (Phase 0)
 
 These are **assumptions to test**, not support claims.
