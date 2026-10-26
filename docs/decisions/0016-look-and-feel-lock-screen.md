@@ -59,6 +59,19 @@ Light colours, and the UI font is Noto Sans.
   for one action, it counts down 30 seconds as Breeze does; Power shows every
   choice without a countdown.
 
+### Amendment 2 (2026-10-26, CI runs 44 and later)
+
+- The lock screen moves from `org.staros.lookandfeel` to the shell package
+  `org.staros.shell` (`contents/lockscreen/LockScreen.qml`). kscreenlocker
+  6.7.5's greeter (`greeter/greeterapp.cpp`, printed by `inspect-kde.sh`)
+  loads `lockscreenmainscript` from the `Plasma/Shell` package of the
+  running shell, after checking `X-Plasma-APIVersion` ≥ 2, and otherwise
+  from its fallback `org.kde.plasma.desktop`: in CI run 44 locking showed
+  that fallback. The first amendment's sentence that kscreenlocker loads
+  the look's `lockscreen/LockScreen.qml` was wrong. The logout greeter does
+  read the look-and-feel package (`logoutmainscript`), so `Logout.qml`
+  stays there.
+
 ## Consequences and trade-offs
 
 - Anyone at the computer can unlock the live session by pressing Return, as

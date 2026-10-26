@@ -315,11 +315,12 @@ gamemode_available() {
     [[ -x $root/usr/bin/gamemoderun ]] && pacman_root -Q gamemode >/dev/null 2>&1
 }
 
-# The Star OS look: its lock screen, the colour scheme, and manual locking
+# The Star OS look: its lock and logout screens, the colour scheme, and manual locking
 # allowed for the live user while the screen never locks by itself (ADR-0016).
 star_os_look() {
     local home="$root/home/liveuser/.config"
-    [[ -f $root/usr/share/plasma/look-and-feel/org.staros.lookandfeel/contents/lockscreen/LockScreen.qml ]] \
+    [[ -f $root/usr/share/plasma/shells/org.staros.shell/contents/lockscreen/LockScreen.qml ]] \
+        && [[ -f $root/usr/share/plasma/look-and-feel/org.staros.lookandfeel/contents/logout/Logout.qml ]] \
         && [[ -f $root/usr/share/color-schemes/StarOS.colors ]] \
         && grep -qx 'LookAndFeelPackage=org.staros.lookandfeel' "$root/etc/xdg/kdeglobals" \
         && grep -qx 'ColorScheme=StarOS' "$root/etc/xdg/kdeglobals" \

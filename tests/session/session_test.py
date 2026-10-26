@@ -43,8 +43,8 @@ Scenarios:
       ~/.config/staros-welcomerc (ADR-0017)
   S24 Game Center opens from the start menu with its search, filters, game
       mode and "Get games"; no games are installed, so it says so
-  S25 locking shows the Star OS lock screen (kscreenlocker with
-      org.staros.lookandfeel): the time, a "Password" field and "Unlock";
+  S25 locking shows the Star OS lock screen (kscreenlocker loads it from
+      the org.staros.shell package): the time, a "Password" field and "Unlock";
       Return unlocks the passwordless live user (ADR-0016)
   S26 Power shows the Star OS logout screen ("What would you like to do?",
       Restart, Shut down, Log out, Cancel); Escape cancels it (ADR-0016)

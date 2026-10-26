@@ -414,3 +414,9 @@ done
 grep -rn -E 'logoutmainscript|LookAndFeel|lookandfeel|loadPackage|setPath|fallback' \
     /tmp/src/plasma-workspace/ksmserver/logout-greeter/ 2>/dev/null | head -n 40 | sed 's/^/    | /'
 grep -rn -E 'lockscreenmainscript|logoutmainscript' /tmp/src/plasma-workspace/ 2>/dev/null | head -n 20 | sed 's/^/    | /'
+printf -- '---- kscreenlocker: where defaultShell() comes from\n'
+grep -rn -B3 -A25 'defaultShell' /tmp/src/kscreenlocker/greeter/ 2>/dev/null | grep -v '^--$' | head -n 90 | sed 's/^/    | /'
+printf -- '---- logout greeter: which look-and-feel package (shutdowndlg.cpp)\n'
+awk 'NR >= 225 && NR <= 275 { printf "    | %d: %s\n", NR, $0 }' /tmp/src/plasma-workspace/logout-greeter/shutdowndlg.cpp
+grep -rn -E 'LookAndFeelPackage|lookAndFeel|packageName|KDE.*LookAndFeel' /tmp/src/plasma-workspace/logout-greeter/ 2>/dev/null \
+    | head -n 20 | sed 's/^/    | /'

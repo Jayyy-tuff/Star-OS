@@ -115,13 +115,13 @@ def check_metadata():
                 if not os.path.isfile(main):
                     problems.append(f"{rel(main)} is missing")
             elif kind == "look-and-feel":
-                for needed in ("defaults", os.path.join("lockscreen", "LockScreen.qml"),
-                               os.path.join("logout", "Logout.qml")):
+                for needed in ("defaults", os.path.join("logout", "Logout.qml")):
                     if not os.path.isfile(os.path.join(base, name, "contents", needed)):
                         problems.append(f"{rel(path)}: contents/{needed} is missing")
             else:
+                # kscreenlocker 6.7 loads the lock screen from the shell package.
                 for needed in ("defaults", "layout.js", os.path.join("views", "Panel.qml"),
-                               os.path.join("views", "Desktop.qml")):
+                               os.path.join("views", "Desktop.qml"), os.path.join("lockscreen", "LockScreen.qml")):
                     if not os.path.isfile(os.path.join(base, name, "contents", needed)):
                         problems.append(f"{rel(path)}: contents/{needed} is missing")
     if found != 4:

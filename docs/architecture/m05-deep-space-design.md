@@ -164,13 +164,15 @@ run.
 
 ## 8. Lock screen and session look (ADR-0016)
 
-- A Star OS look-and-feel package `org.staros.lookandfeel` with
-  `lockscreen/LockScreen.qml`: the wallpaper dimmed, the time and date, the
+- The lock screen `lockscreen/LockScreen.qml` in the Star OS shell package
+  `org.staros.shell` (kscreenlocker 6.7 loads it from the shell package; see
+  ADR-0016's second amendment): the wallpaper dimmed, the time and date, the
   user's picture or initial and name, a "Password" field and "Unlock"; Return
   with an empty field unlocks the passwordless live user through PAM's
   `nullok`. `kdeglobals` names the package. On the live medium the screen
   never locks by itself (`Autolock=false`), but Lock and Meta+L work.
-- `logout/Logout.qml`: the same glass and wallpaper with Restart, Shut down,
+- `logout/Logout.qml` in the look-and-feel package `org.staros.lookandfeel`
+  (which also sets the colours and icons): the same glass and wallpaper with Restart, Shut down,
   Log out (and Sleep where offered) and Cancel; one asked-for action counts
   down 30 seconds as in Breeze.
 - `StarOS` colour scheme (`/usr/share/color-schemes/StarOS.colors`, its

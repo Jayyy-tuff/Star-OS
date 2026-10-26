@@ -6,8 +6,9 @@ import QtQuick.Templates as T
 import StarOS.Shell
 
 // The Star OS lock screen (M0.5, ADR-0016), loaded by kscreenlocker's
-// greeter: the wallpaper dimmed, the time and date, the user and a password
-// field. kscreenlocker provides 'authenticator' (PAM) and the user's name and
+// greeter from the shell package (kscreenlocker 6.7 reads the Plasma/Shell
+// package's lockscreen/LockScreen.qml, not the look-and-feel package's): the
+// wallpaper dimmed, the time and date, the user and a password field. kscreenlocker provides 'authenticator' (PAM) and the user's name and
 // picture as context properties; the greeter quits (unlocking) when PAM
 // accepts. The live user has no password: Return unlocks through
 // pam_unix's nullok.
