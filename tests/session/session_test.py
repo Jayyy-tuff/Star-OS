@@ -938,15 +938,22 @@ def scenario_logout_screen(s):
         s.check("S26", bool(find(tree, name=name, showing=True)), f"the logout screen shows {name!r}: {showing_objects(tree, 40)}")
     s.screenshot("S26-logout")
     s.keys("esc")
-    closed = False
-    deadline = time.monotonic() + 15
+    # The greeter is the D-Bus service org.kde.LogoutPrompt and may outlive
+    # its screen: closed means it exited or shows nothing any more.
+    closed, how = False, ""
+    deadline = time.monotonic() + 20
     while time.monotonic() < deadline and not closed:
-        code, _, _ = s.guest(["/usr/bin/pgrep", "-u", "liveuser", "-f", "ksmserver-logout-greeter"])
-        closed = code != 0
         time.sleep(1)
+        code, _, _ = s.guest(["/usr/bin/pgrep", "-u", "liveuser", "-f", "ksmserver-logout-greeter"])
+        if code != 0:
+            closed, how = True, "the greeter exited"
+            break
+        tree = s.atspi("walk", "ksmserver-logout-greeter", "3")
+        if "error" not in tree and not find(tree, name="What would you like to do?", showing=True):
+            closed, how = True, "the greeter shows nothing"
     if not closed:
         s.as_user(["/usr/bin/pkill", "-f", "ksmserver-logout-greeter"], timeout=30)
-    s.check("S26", closed, "Escape cancelled the logout screen")
+    s.check("S26", closed, f"Escape cancelled the logout screen ({how or 'still showing after 20 s'})")
 
 
 def paste(s):
