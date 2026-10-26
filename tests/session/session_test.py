@@ -997,7 +997,11 @@ def scenario_clipboard(s):
     s.check("S21", bool(frames), f"Meta+V opens the clipboard history: {showing_objects(tree, 60)}")
     panel = frames[0] if frames else {}
     lists = find(panel, role="list", name="Copies", showing=True)
-    rows = [n.get("name") for n in find(lists[0], role=BUTTON, showing=True)] if lists else []
+    # The copies as shown, top to bottom: AT-SPI lists a view's rows in the
+    # order they were created, and each row holds a 'Forget this copy' button.
+    buttons = [n for n in find(lists[0], role=BUTTON, showing=True)
+               if n.get("name") != "Forget this copy" and n.get("extents")] if lists else []
+    rows = [n.get("name") for n in sorted(buttons, key=lambda n: n["extents"][1])]
     s.record("S21", "INFO", f"copies: {json.dumps(rows)}")
     s.check("S21", rows[:2] == [second, first], f"newest first: {json.dumps(rows[:2])}")
     s.screenshot("S21-clipboard")
