@@ -926,6 +926,12 @@ def scenario_lock_screen(s):
     fields = [n for n in find(tree, showing=True) if n.get("role") == "password text" or n.get("name") == "Password"]
     nodes = [(n.get("role"), n.get("name"), n.get("states")) for n in find(tree)]
     s.record("S25", "INFO", f"lock screen nodes: {json.dumps(nodes[:30])[:1500]}")
+    if not fields:
+        # Not listed in the tree: the greeter's focused object is the field.
+        focus = s.wait_focus(("password text", "text"), None, seconds=10)
+        s.record("S25", "INFO", f"focus: {json.dumps(focus)}")
+        if focus.get("application") == "kscreenlocker_greet" and focus.get("role") in ("password text", "text"):
+            fields = [focus]
     s.check("S25", bool(fields) and bool(find(tree, name="Unlock", showing=True)),
             f"the lock screen shows a password field and 'Unlock': {json.dumps(fields[:1])}")
     s.screenshot("S25-lock-screen")
